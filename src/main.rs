@@ -1,13 +1,14 @@
 use anyhow::Result;
-use tracing::{info, error};
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod app;
-mod client;
 mod auth;
-mod ui;
+mod client;
+mod error;
 mod models;
 mod services;
+mod ui;
 mod utils;
 
 use app::JellyfinApp;
@@ -23,7 +24,7 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Starting Crabfin - Jellyfin Native Client");
+    info!("Starting Crabfin");
 
     // Run the application with proper error handling
     match JellyfinApp::run().await {
