@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+pub mod jellyfin;
+pub mod request;
+pub mod response;
+
 /// Media item representing any playable content
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaItem {
