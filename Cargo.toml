@@ -1,5 +1,5 @@
 [package]
-name = "crabfin"
+name = "Crabfin"
 version = "0.1.0"
 edition = "2024"
 description = "A native Jellyfin client built with Rust and GPUI"
