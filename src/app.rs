@@ -115,9 +115,19 @@ impl JellyfinApp {
 
             // Create the main window component
             cx.new(|cx| {
-                // Observe window appearance changes for theme updates
-                cx.observe_window_appearance(window, |_, _, cx| {
-                    cx.refresh_windows();
+                // Setup system appearance observation for this window
+                cx.observe_window_appearance(window, |_, window, cx| {
+                    use crate::ui::theme::ThemeContext;
+
+                    let window_appearance = window.appearance();
+                    let is_dark = matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark);
+
+                    // Update theme context if using system mode
+                    ThemeContext::update_global(cx, |theme_ctx| {
+                        theme_ctx.handle_system_theme_change(is_dark);
+                    });
+
+                    info!("System appearance changed to: {}", if is_dark { "dark" } else { "light" });
                 }).detach();
 
                 // Handle app quit events

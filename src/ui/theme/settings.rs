@@ -2,6 +2,31 @@ use crate::ui::theme::Color;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Theme mode enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThemeMode {
+    Light,
+    Dark,
+    System,
+}
+
+impl ThemeMode {
+    /// Resolve the theme mode to a boolean (true = dark, false = light)
+    pub fn resolve(&self, system_is_dark: bool) -> bool {
+        match self {
+            ThemeMode::Light => false,
+            ThemeMode::Dark => true,
+            ThemeMode::System => system_is_dark,
+        }
+    }
+}
+
+impl Default for ThemeMode {
+    fn default() -> Self {
+        ThemeMode::System
+    }
+}
+
 /// Theme settings for persistence across app sessions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeSettings {
@@ -17,8 +42,8 @@ pub struct ThemeSettings {
     /// Whether to animate theme transitions
     pub transition_animations: bool,
 
-    /// Whether to follow system dark/light mode preference
-    pub follow_system_theme: bool,
+    /// Theme mode preference (System, Light, Dark)
+    pub theme_mode: ThemeMode,
 
     /// Duration of theme transition animations in milliseconds
     pub transition_duration_ms: u64,
@@ -92,9 +117,14 @@ impl ThemeSettings {
         std::time::Duration::from_millis(self.transition_duration_ms)
     }
 
-    /// Enable or disable following system theme preference
-    pub fn set_follow_system_theme(&mut self, follow: bool) {
-        self.follow_system_theme = follow;
+    /// Set theme mode preference
+    pub fn set_theme_mode(&mut self, mode: ThemeMode) {
+        self.theme_mode = mode;
+    }
+
+    /// Get current theme mode
+    pub fn get_theme_mode(&self) -> ThemeMode {
+        self.theme_mode
     }
 
     /// Reset to default settings
@@ -131,34 +161,9 @@ impl Default for ThemeSettings {
             custom_color: None,
             last_wallpaper_path: None,
             transition_animations: true,
-            follow_system_theme: true,
+            theme_mode: ThemeMode::default(),
             transition_duration_ms: 300,
         }
-    }
-}
-
-/// Theme mode enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ThemeMode {
-    Light,
-    Dark,
-    System,
-}
-
-impl ThemeMode {
-    /// Resolve the theme mode to a boolean (true = dark, false = light)
-    pub fn resolve(&self, system_is_dark: bool) -> bool {
-        match self {
-            ThemeMode::Light => false,
-            ThemeMode::Dark => true,
-            ThemeMode::System => system_is_dark,
-        }
-    }
-}
-
-impl Default for ThemeMode {
-    fn default() -> Self {
-        ThemeMode::System
     }
 }
 

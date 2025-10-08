@@ -1,4 +1,4 @@
-use crate::ui::theme::{Color, MaterialPalette, ThemeAnimationManager, ThemeSettings, ThemeSource};
+use crate::ui::theme::{Color, MaterialPalette, ThemeAnimationManager, ThemeMode, ThemeSettings, ThemeSource};
 use gpui::*;
 use std::time::Duration;
 
@@ -19,8 +19,8 @@ pub struct ThemeContext {
     /// Duration for theme transition animations
     pub transition_duration: Duration,
 
-    /// Whether system dark/light mode detection is active
-    pub system_theme_detection: bool,
+    /// Current system dark mode state (cached)
+    pub system_is_dark: bool,
 
     /// Animation manager for smooth transitions
     pub animation_manager: ThemeAnimationManager,
@@ -33,13 +33,18 @@ pub struct ThemeContext {
 impl ThemeContext {
     /// Create a new theme context with default Material 3 palette
     pub fn new() -> Self {
+        // Default to light mode initially - will be updated by system appearance
+        let system_is_dark = false;
+        let settings = ThemeSettings::default();
+        let is_dark_mode = settings.theme_mode.resolve(system_is_dark);
+
         Self {
             current_palette: MaterialPalette::default(),
-            is_dark_mode: false,
+            is_dark_mode,
             theme_source: ThemeSource::default(),
-            settings: ThemeSettings::default(),
+            settings,
             transition_duration: Duration::from_millis(300),
-            system_theme_detection: true,
+            system_is_dark,
             animation_manager: ThemeAnimationManager::new(),
             animation_task: None,
         }
@@ -47,13 +52,18 @@ impl ThemeContext {
 
     /// Create theme context with specific palette
     pub fn with_palette(palette: MaterialPalette) -> Self {
+        // Default to light mode initially - will be updated by system appearance
+        let system_is_dark = false;
+        let settings = ThemeSettings::default();
+        let is_dark_mode = settings.theme_mode.resolve(system_is_dark);
+
         Self {
             current_palette: palette,
-            is_dark_mode: false,
+            is_dark_mode,
             theme_source: ThemeSource::default(),
-            settings: ThemeSettings::default(),
+            settings,
             transition_duration: Duration::from_millis(300),
-            system_theme_detection: true,
+            system_is_dark,
             animation_manager: ThemeAnimationManager::new(),
             animation_task: None,
         }
@@ -86,11 +96,19 @@ impl ThemeContext {
     pub fn update_settings(&mut self, settings: ThemeSettings) {
         self.settings = settings;
         self.transition_duration = self.settings.get_transition_duration();
+        // Update dark mode based on new theme mode setting
+        self.is_dark_mode = self.settings.theme_mode.resolve(self.system_is_dark);
     }
 
-    /// Enable or disable system theme detection
-    pub fn set_system_theme_detection(&mut self, enabled: bool) {
-        self.system_theme_detection = enabled;
+    /// Set theme mode preference
+    pub fn set_theme_mode(&mut self, mode: ThemeMode) {
+        self.settings.set_theme_mode(mode);
+        self.is_dark_mode = mode.resolve(self.system_is_dark);
+    }
+
+    /// Get current theme mode
+    pub fn get_theme_mode(&self) -> ThemeMode {
+        self.settings.get_theme_mode()
     }
 
     /// Get the current palette
@@ -123,9 +141,20 @@ impl ThemeContext {
         self.transition_duration
     }
 
-    /// Check if system theme detection is enabled
-    pub fn is_system_theme_detection_enabled(&self) -> bool {
-        self.system_theme_detection
+    /// Get current system dark mode state
+    pub fn get_system_is_dark(&self) -> bool {
+        self.system_is_dark
+    }
+
+    /// Update system dark mode state and refresh theme if needed
+    pub fn update_system_theme(&mut self, system_is_dark: bool) {
+        if self.system_is_dark != system_is_dark {
+            self.system_is_dark = system_is_dark;
+            // Update dark mode if using system theme
+            if self.settings.theme_mode == ThemeMode::System {
+                self.is_dark_mode = system_is_dark;
+            }
+        }
     }
 
     /// Get surface colors for current theme mode
@@ -181,9 +210,7 @@ impl ThemeContext {
 
     /// Handle system theme change
     pub fn handle_system_theme_change(&mut self, is_dark: bool) {
-        if self.system_theme_detection && self.settings.follow_system_theme {
-            self.set_dark_mode(is_dark);
-        }
+        self.update_system_theme(is_dark);
     }
 
     /// Check if dynamic theming is enabled
@@ -215,6 +242,32 @@ impl ThemeContext {
             self.theme_source = ThemeSource::Default;
         }
     }
+
+    /// Convenience method to set theme to light mode
+    pub fn set_light_mode(&mut self) {
+        self.set_theme_mode(ThemeMode::Light);
+    }
+
+    /// Convenience method to set theme to dark mode
+    pub fn set_dark_mode_explicit(&mut self) {
+        self.set_theme_mode(ThemeMode::Dark);
+    }
+
+    /// Convenience method to set theme to follow system
+    pub fn set_system_mode(&mut self) {
+        self.set_theme_mode(ThemeMode::System);
+    }
+
+    /// Check if currently using system theme mode
+    pub fn is_using_system_mode(&self) -> bool {
+        self.settings.theme_mode == ThemeMode::System
+    }
+
+    /// Get current system appearance from GPUI
+    pub fn get_current_system_appearance(cx: &App) -> bool {
+        let window_appearance = cx.window_appearance();
+        matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark)
+    }
 }
 
 impl Default for ThemeContext {
@@ -231,7 +284,7 @@ impl Clone for ThemeContext {
             theme_source: self.theme_source.clone(),
             settings: self.settings.clone(),
             transition_duration: self.transition_duration,
-            system_theme_detection: self.system_theme_detection,
+            system_is_dark: self.system_is_dark,
             animation_manager: self.animation_manager.clone(),
             animation_task: None, // Don't clone the task
         }
@@ -260,131 +313,5 @@ impl ThemeContext {
     }
 }
 
-/// System theme detection utilities
-pub struct SystemThemeDetector;
 
-impl SystemThemeDetector {
-    /// Detect if the system is currently in dark mode
-    pub fn is_system_dark_mode() -> bool {
-        // Platform-specific system theme detection
-        #[cfg(target_os = "macos")]
-        {
-            Self::is_macos_dark_mode()
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            Self::is_linux_dark_mode()
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            Self::is_windows_dark_mode()
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-        {
-            false // Default to light mode on unsupported platforms
-        }
-    }
-
-    /// Start monitoring system theme changes
-    pub fn start_monitoring<F>(callback: F) -> anyhow::Result<()>
-    where
-        F: Fn(bool) + Send + Sync + 'static,
-    {
-        // Platform-specific system theme monitoring
-        #[cfg(target_os = "macos")]
-        {
-            Self::start_macos_monitoring(callback)
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            Self::start_linux_monitoring(callback)
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            Self::start_windows_monitoring(callback)
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-        {
-            Ok(()) // No-op on unsupported platforms
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    fn is_macos_dark_mode() -> bool {
-        // TODO: Implement macOS dark mode detection using NSUserDefaults
-        // For now, return false as a placeholder
-        false
-    }
-
-    #[cfg(target_os = "macos")]
-    fn start_macos_monitoring<F>(_callback: F) -> anyhow::Result<()>
-    where
-        F: Fn(bool) + Send + Sync + 'static,
-    {
-        // TODO: Implement macOS system theme monitoring using NSDistributedNotificationCenter
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    fn is_linux_dark_mode() -> bool {
-        // Try to detect dark mode through various Linux desktop environment methods
-
-        // GNOME/GTK
-        if let Ok(output) = std::process::Command::new("gsettings")
-            .args(&["get", "org.gnome.desktop.interface", "gtk-theme"])
-            .output()
-        {
-            if let Ok(theme) = String::from_utf8(output.stdout) {
-                return theme.to_lowercase().contains("dark");
-            }
-        }
-
-        // KDE Plasma
-        if let Ok(output) = std::process::Command::new("kreadconfig5")
-            .args(&["--group", "General", "--key", "ColorScheme"])
-            .output()
-        {
-            if let Ok(scheme) = String::from_utf8(output.stdout) {
-                return scheme.to_lowercase().contains("dark");
-            }
-        }
-
-        // Fallback: check environment variables
-        if let Ok(theme) = std::env::var("GTK_THEME") {
-            return theme.to_lowercase().contains("dark");
-        }
-
-        false
-    }
-
-    #[cfg(target_os = "linux")]
-    fn start_linux_monitoring<F>(_callback: F) -> anyhow::Result<()>
-    where
-        F: Fn(bool) + Send + Sync + 'static,
-    {
-        // TODO: Implement Linux system theme monitoring using dbus or file watchers
-        Ok(())
-    }
-
-    #[cfg(target_os = "windows")]
-    fn is_windows_dark_mode() -> bool {
-        // TODO: Implement Windows dark mode detection using registry
-        false
-    }
-
-    #[cfg(target_os = "windows")]
-    fn start_windows_monitoring<F>(_callback: F) -> anyhow::Result<()>
-    where
-        F: Fn(bool) + Send + Sync + 'static,
-    {
-        // TODO: Implement Windows system theme monitoring using registry watchers
-        Ok(())
-    }
-}
 

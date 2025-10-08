@@ -92,30 +92,21 @@ impl Global for Theme {}
 
 /// Setup the theme system in the GPUI app
 pub fn setup_theme(cx: &mut App) {
-    use crate::ui::theme::context::{SystemThemeDetector, ThemeContext};
+    use crate::ui::theme::context::ThemeContext;
 
-    // Initialize the reactive theme context
+    // Initialize the reactive theme context with initial system appearance
     let mut theme_context = ThemeContext::new();
 
-    // Detect initial system theme
-    let is_dark = SystemThemeDetector::is_system_dark_mode();
-    theme_context.is_dark_mode = is_dark;
+    // Set initial system appearance state
+    let window_appearance = cx.window_appearance();
+    let is_dark = matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark);
+    theme_context.handle_system_theme_change(is_dark);
 
-    // Set as global
     cx.set_global(theme_context);
-
-    // Start system theme monitoring
-    if let Err(e) = SystemThemeDetector::start_monitoring(move |is_dark| {
-        // Note: In a real implementation, we'd need to properly handle the context update
-        // This is a simplified version for demonstration
-        tracing::debug!("System theme changed to: {}", if is_dark { "dark" } else { "light" });
-    }) {
-        tracing::warn!("Failed to start system theme monitoring: {}", e);
-    }
 
     // Setup legacy theme for backward compatibility
     let legacy_theme = Theme::default();
     cx.set_global(legacy_theme);
 
-    tracing::debug!("Theme system initialized with reactive context");
+    tracing::debug!("Theme system initialized with GPUI native system appearance detection");
 }
