@@ -49,6 +49,12 @@ image = "0.25"
 # Platform-specific dependencies
 dirs = "6"
 
+# File system watching
+notify = "8"
+
+# Wallpaper detection
+wallpaper = "3"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.55"
 
