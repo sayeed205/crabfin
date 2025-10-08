@@ -848,6 +848,94 @@ pub struct MediaAttachment {
     /// Delivery url
     pub delivery_url: Option<String>,
 }
+
+/// Response from Items endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ItemsResponse {
+    /// List of items
+    pub items: Vec<BaseItem>,
+    /// Total number of records
+    pub total_record_count: i32,
+    /// Starting index
+    pub start_index: i32,
+}
+
+/// Search hint result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SearchHintResult {
+    /// Search hints
+    pub search_hints: Vec<SearchHint>,
+    /// Total record count
+    pub total_record_count: i32,
+}
+
+/// Individual search hint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SearchHint {
+    /// Item ID
+    pub item_id: String,
+    /// Item ID as GUID
+    pub id: String,
+    /// Name
+    pub name: String,
+    /// Matched term
+    pub matched_term: Option<String>,
+    /// Index number
+    pub index_number: Option<i32>,
+    /// Production year
+    pub production_year: Option<i32>,
+    /// Parent index number
+    pub parent_index_number: Option<i32>,
+    /// Primary image tag
+    pub primary_image_tag: Option<String>,
+    /// Thumb image tag
+    pub thumb_image_tag: Option<String>,
+    /// Thumb image item ID
+    pub thumb_image_item_id: Option<String>,
+    /// Backdrop image tag
+    pub backdrop_image_tag: Option<String>,
+    /// Backdrop image item ID
+    pub backdrop_image_item_id: Option<String>,
+    /// Type
+    #[serde(rename = "Type")]
+    pub item_type: String,
+    /// Is folder
+    pub is_folder: Option<bool>,
+    /// Run time ticks
+    pub run_time_ticks: Option<i64>,
+    /// Media type
+    pub media_type: Option<String>,
+    /// Start date
+    pub start_date: Option<String>,
+    /// End date
+    pub end_date: Option<String>,
+    /// Series
+    pub series: Option<String>,
+    /// Status
+    pub status: Option<String>,
+    /// Album
+    pub album: Option<String>,
+    /// Album ID
+    pub album_id: Option<String>,
+    /// Album artist
+    pub album_artist: Option<String>,
+    /// Artists
+    pub artists: Vec<String>,
+    /// Song count
+    pub song_count: Option<i32>,
+    /// Episode count
+    pub episode_count: Option<i32>,
+    /// Channel ID
+    pub channel_id: Option<String>,
+    /// Channel name
+    pub channel_name: Option<String>,
+    /// Primary image aspect ratio
+    pub primary_image_aspect_ratio: Option<f64>,
+}
+
 // Request parameter types
 
 /// Sort order enumeration
@@ -1016,306 +1104,217 @@ pub struct ItemsQuery {
     pub min_width: Option<i32>,
     /// Min height
     pub min_height: Option<i32>,
-    /// Max width
-    pub max_width: Option<i32>,
-    /// Max height
-    pub max_height: Option<i32>,
-    /// Is 3D
-    pub is_3d: Option<bool>,
-    /// Series IDs
-    pub series_ids: Vec<String>,
-    /// Box set IDs
-    pub box_set_ids: Vec<String>,
-    /// Artist IDs
-    pub artist_ids: Vec<String>,
-    /// Album artist IDs
-    pub album_artist_ids: Vec<String>,
-    /// Contributing artist IDs
-    pub contributing_artist_ids: Vec<String>,
-    /// Album IDs
-    pub album_ids: Vec<String>,
-    /// IDs
-    pub ids: Vec<String>,
-    /// Exclude IDs
-    pub exclude_ids: Vec<String>,
-    /// Exclude artist IDs
-    pub exclude_artist_ids: Vec<String>,
-    /// Exclude series IDs
-    pub exclude_series_ids: Vec<String>,
-    /// Exclude album IDs
-    pub exclude_album_ids: Vec<String>,
-    /// Group items into collections
-    pub group_items_into_collections: Option<bool>,
-    /// Is locked
-    pub is_locked: Option<bool>,
-    /// Is place holder
-    pub is_place_holder: Option<bool>,
-    /// Has official rating
-    pub has_official_rating_2: Option<bool>,
-    /// Is in box set
-    pub is_in_box_set: Option<bool>,
 }
 
 impl ItemsQuery {
-    /// Create a new ItemsQuery builder
+    /// Create a new empty ItemsQuery
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set parent ID
-    pub fn parent_id<S: Into<String>>(mut self, parent_id: S) -> Self {
-        self.parent_id = Some(parent_id.into());
+    /// Convert the query parameters to a URL query string
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+
+        // Helper macro to add optional parameters
+        macro_rules! add_param {
+            ($field:expr, $name:expr) => {
+                if let Some(ref value) = $field {
+                    params.push(format!("{}={}", $name, urlencoding::encode(&value.to_string())));
+                }
+            };
+        }
+
+        // Helper macro to add boolean parameters
+        macro_rules! add_bool_param {
+            ($field:expr, $name:expr) => {
+                if let Some(value) = $field {
+                    params.push(format!("{}={}", $name, value));
+                }
+            };
+        }
+
+        // Helper macro to add vector parameters
+        macro_rules! add_vec_param {
+            ($field:expr, $name:expr) => {
+                if !$field.is_empty() {
+                    let encoded_values: Vec<String> = $field.iter()
+                        .map(|v| urlencoding::encode(&v.to_string()).to_string())
+                        .collect();
+                    params.push(format!("{}={}", $name, encoded_values.join(",")));
+                }
+            };
+        }
+
+        // Add all parameters
+        add_param!(self.parent_id, "parentId");
+        add_vec_param!(self.include_item_types, "includeItemTypes");
+        add_vec_param!(self.exclude_item_types, "excludeItemTypes");
+
+        if self.recursive {
+            params.push("recursive=true".to_string());
+        }
+
+        add_vec_param!(self.sort_by, "sortBy");
+
+        match self.sort_order {
+            SortOrder::Ascending => params.push("sortOrder=Ascending".to_string()),
+            SortOrder::Descending => params.push("sortOrder=Descending".to_string()),
+        }
+
+        add_param!(self.limit, "limit");
+        add_param!(self.start_index, "startIndex");
+        add_param!(self.search_term, "searchTerm");
+        add_param!(self.user_id, "userId");
+        add_vec_param!(self.fields, "fields");
+        add_bool_param!(self.enable_images, "enableImages");
+        add_param!(self.image_type_limit, "imageTypeLimit");
+        add_vec_param!(self.enable_image_types, "enableImageTypes");
+        add_bool_param!(self.enable_user_data, "enableUserData");
+        add_bool_param!(self.enable_total_record_count, "enableTotalRecordCount");
+        add_vec_param!(self.filters, "filters");
+        add_vec_param!(self.years, "years");
+        add_vec_param!(self.genres, "genres");
+        add_vec_param!(self.official_ratings, "officialRatings");
+        add_vec_param!(self.tags, "tags");
+        add_vec_param!(self.studios, "studios");
+        add_vec_param!(self.artists, "artists");
+        add_vec_param!(self.albums, "albums");
+        add_vec_param!(self.person_ids, "personIds");
+        add_vec_param!(self.person_types, "personTypes");
+        add_bool_param!(self.is_played, "isPlayed");
+        add_bool_param!(self.is_favorite, "isFavorite");
+        add_bool_param!(self.has_trailer, "hasTrailer");
+        add_bool_param!(self.has_theme_song, "hasThemeSong");
+        add_bool_param!(self.has_theme_video, "hasThemeVideo");
+        add_bool_param!(self.has_subtitles, "hasSubtitles");
+        add_bool_param!(self.has_special_features, "hasSpecialFeatures");
+        add_bool_param!(self.has_lyrics, "hasLyrics");
+        add_bool_param!(self.has_overview, "hasOverview");
+        add_bool_param!(self.has_imdb_id, "hasImdbId");
+        add_bool_param!(self.has_tmdb_id, "hasTmdbId");
+        add_bool_param!(self.has_tvdb_id, "hasTvdbId");
+        add_bool_param!(self.is_hd, "isHd");
+        add_bool_param!(self.is_4k, "is4K");
+        add_vec_param!(self.location_types, "locationTypes");
+        add_vec_param!(self.exclude_location_types, "excludeLocationTypes");
+        add_vec_param!(self.media_types, "mediaTypes");
+        add_vec_param!(self.video_types, "videoTypes");
+        add_vec_param!(self.video_3d_formats, "video3DFormats");
+        add_vec_param!(self.series_statuses, "seriesStatuses");
+        add_param!(self.name_starts_with_or_greater, "nameStartsWithOrGreater");
+        add_param!(self.name_starts_with, "nameStartsWith");
+        add_param!(self.name_less_than, "nameLessThan");
+        add_param!(self.adjacent_to, "adjacentTo");
+        add_param!(self.min_official_rating, "minOfficialRating");
+        add_param!(self.max_official_rating, "maxOfficialRating");
+        add_param!(self.min_sort_name, "minSortName");
+        add_param!(self.min_date_created, "minDateCreated");
+        add_param!(self.max_date_created, "maxDateCreated");
+        add_param!(self.min_premiere_date, "minPremiereDate");
+        add_param!(self.max_premiere_date, "maxPremiereDate");
+        add_param!(self.min_community_rating, "minCommunityRating");
+        add_param!(self.min_critic_rating, "minCriticRating");
+        add_param!(self.min_index_number, "minIndexNumber");
+        add_param!(self.min_player_count, "minPlayerCount");
+        add_param!(self.max_player_count, "maxPlayerCount");
+        add_param!(self.parent_index_number, "parentIndexNumber");
+        add_bool_param!(self.has_parental_rating, "hasParentalRating");
+        add_bool_param!(self.is_airing, "isAiring");
+        add_param!(self.max_air_date, "maxAirDate");
+        add_param!(self.min_air_date, "minAirDate");
+        add_param!(self.series_timer_id, "seriesTimerId");
+        add_param!(self.min_resume_percentage, "minResumePercentage");
+        add_param!(self.max_resume_percentage, "maxResumePercentage");
+        add_bool_param!(self.has_aired, "hasAired");
+        add_bool_param!(self.has_official_rating, "hasOfficialRating");
+        add_bool_param!(self.collapse_box_set_items, "collapseBoxSetItems");
+        add_param!(self.min_width, "minWidth");
+        add_param!(self.min_height, "minHeight");
+
+        params.join("&")
+    }
+
+    /// Builder method to set parent ID
+    pub fn parent_id(mut self, parent_id: String) -> Self {
+        self.parent_id = Some(parent_id);
         self
     }
 
-    /// Add include item type
-    pub fn include_item_type<S: Into<String>>(mut self, item_type: S) -> Self {
-        self.include_item_types.push(item_type.into());
-        self
-    }
-
-    /// Set include item types
-    pub fn include_item_types<I, S>(mut self, item_types: I) -> Self
-    where
-        I: IntoIterator<Item=S>,
-        S: Into<String>,
-    {
-        self.include_item_types = item_types.into_iter().map(|s| s.into()).collect();
-        self
-    }
-
-    /// Add exclude item type
-    pub fn exclude_item_type<S: Into<String>>(mut self, item_type: S) -> Self {
-        self.exclude_item_types.push(item_type.into());
-        self
-    }
-
-    /// Set recursive search
+    /// Builder method to set recursive search
     pub fn recursive(mut self, recursive: bool) -> Self {
         self.recursive = recursive;
         self
     }
 
-    /// Add sort by field
-    pub fn sort_by<S: Into<String>>(mut self, field: S) -> Self {
-        self.sort_by.push(field.into());
-        self
-    }
-
-    /// Set sort order
-    pub fn sort_order(mut self, order: SortOrder) -> Self {
-        self.sort_order = order;
-        self
-    }
-
-    /// Set limit
+    /// Builder method to set limit
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
-    /// Set start index
+    /// Builder method to set start index
     pub fn start_index(mut self, start_index: u32) -> Self {
         self.start_index = Some(start_index);
         self
     }
 
-    /// Set search term
-    pub fn search_term<S: Into<String>>(mut self, term: S) -> Self {
-        self.search_term = Some(term.into());
+    /// Builder method to add include item types
+    pub fn include_item_types(mut self, types: Vec<String>) -> Self {
+        self.include_item_types = types;
         self
     }
 
-    /// Set user ID
-    pub fn user_id<S: Into<String>>(mut self, user_id: S) -> Self {
-        self.user_id = Some(user_id.into());
+    /// Builder method to add sort by fields
+    pub fn sort_by(mut self, fields: Vec<String>) -> Self {
+        self.sort_by = fields;
         self
     }
 
-    /// Add field to include
-    pub fn field<S: Into<String>>(mut self, field: S) -> Self {
-        self.fields.push(field.into());
+    /// Builder method to set sort order
+    pub fn sort_order(mut self, order: SortOrder) -> Self {
+        self.sort_order = order;
         self
     }
 
-    /// Set fields to include
-    pub fn fields<I, S>(mut self, fields: I) -> Self
-    where
-        I: IntoIterator<Item=S>,
-        S: Into<String>,
-    {
-        self.fields = fields.into_iter().map(|s| s.into()).collect();
+    /// Builder method to set search term
+    pub fn search_term(mut self, term: String) -> Self {
+        self.search_term = Some(term);
         self
     }
 
-    /// Enable images
-    pub fn enable_images(mut self, enable: bool) -> Self {
-        self.enable_images = Some(enable);
+    /// Builder method to set user ID
+    pub fn user_id(mut self, user_id: String) -> Self {
+        self.user_id = Some(user_id);
         self
     }
 
-    /// Set image type limit
-    pub fn image_type_limit(mut self, limit: u32) -> Self {
-        self.image_type_limit = Some(limit);
-        self
-    }
-
-    /// Enable user data
+    /// Builder method to enable user data
     pub fn enable_user_data(mut self, enable: bool) -> Self {
         self.enable_user_data = Some(enable);
         self
     }
 
-    /// Enable total record count
+    /// Builder method to enable total record count
     pub fn enable_total_record_count(mut self, enable: bool) -> Self {
         self.enable_total_record_count = Some(enable);
         self
     }
-
-    /// Add genre filter
-    pub fn genre<S: Into<String>>(mut self, genre: S) -> Self {
-        self.genres.push(genre.into());
-        self
-    }
-
-    /// Set genres filter
-    pub fn genres<I, S>(mut self, genres: I) -> Self
-    where
-        I: IntoIterator<Item=S>,
-        S: Into<String>,
-    {
-        self.genres = genres.into_iter().map(|s| s.into()).collect();
-        self
-    }
-
-    /// Add year filter
-    pub fn year(mut self, year: u32) -> Self {
-        self.years.push(year);
-        self
-    }
-
-    /// Set years filter
-    pub fn years<I>(mut self, years: I) -> Self
-    where
-        I: IntoIterator<Item=u32>,
-    {
-        self.years = years.into_iter().collect();
-        self
-    }
-
-    /// Set is played filter
-    pub fn is_played(mut self, is_played: bool) -> Self {
-        self.is_played = Some(is_played);
-        self
-    }
-
-    /// Set is favorite filter
-    pub fn is_favorite(mut self, is_favorite: bool) -> Self {
-        self.is_favorite = Some(is_favorite);
-        self
-    }
-
-    /// Convert to query parameters for HTTP request
-    pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        if let Some(ref parent_id) = self.parent_id {
-            params.push(("ParentId".to_string(), parent_id.clone()));
-        }
-
-        if !self.include_item_types.is_empty() {
-            params.push((
-                "IncludeItemTypes".to_string(),
-                self.include_item_types.join(","),
-            ));
-        }
-
-        if !self.exclude_item_types.is_empty() {
-            params.push((
-                "ExcludeItemTypes".to_string(),
-                self.exclude_item_types.join(","),
-            ));
-        }
-
-        if self.recursive {
-            params.push(("Recursive".to_string(), "true".to_string()));
-        }
-
-        if !self.sort_by.is_empty() {
-            params.push(("SortBy".to_string(), self.sort_by.join(",")));
-        }
-
-        match self.sort_order {
-            SortOrder::Ascending => params.push(("SortOrder".to_string(), "Ascending".to_string())),
-            SortOrder::Descending => params.push(("SortOrder".to_string(), "Descending".to_string())),
-        }
-
-        if let Some(limit) = self.limit {
-            params.push(("Limit".to_string(), limit.to_string()));
-        }
-
-        if let Some(start_index) = self.start_index {
-            params.push(("StartIndex".to_string(), start_index.to_string()));
-        }
-
-        if let Some(ref search_term) = self.search_term {
-            params.push(("SearchTerm".to_string(), search_term.clone()));
-        }
-
-        if let Some(ref user_id) = self.user_id {
-            params.push(("UserId".to_string(), user_id.clone()));
-        }
-
-        if !self.fields.is_empty() {
-            params.push(("Fields".to_string(), self.fields.join(",")));
-        }
-
-        if let Some(enable_images) = self.enable_images {
-            params.push(("EnableImages".to_string(), enable_images.to_string()));
-        }
-
-        if let Some(image_type_limit) = self.image_type_limit {
-            params.push(("ImageTypeLimit".to_string(), image_type_limit.to_string()));
-        }
-
-        if let Some(enable_user_data) = self.enable_user_data {
-            params.push(("EnableUserData".to_string(), enable_user_data.to_string()));
-        }
-
-        if let Some(enable_total_record_count) = self.enable_total_record_count {
-            params.push((
-                "EnableTotalRecordCount".to_string(),
-                enable_total_record_count.to_string(),
-            ));
-        }
-
-        if !self.genres.is_empty() {
-            params.push(("Genres".to_string(), self.genres.join(",")));
-        }
-
-        if !self.years.is_empty() {
-            let years_str = self
-                .years
-                .iter()
-                .map(|y| y.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            params.push(("Years".to_string(), years_str));
-        }
-
-        if let Some(is_played) = self.is_played {
-            params.push(("IsPlayed".to_string(), is_played.to_string()));
-        }
-
-        if let Some(is_favorite) = self.is_favorite {
-            params.push(("IsFavorite".to_string(), is_favorite.to_string()));
-        }
-
-        params
-    }
 }
 
-/// Stream parameters for media streaming
+/// Playback info response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoResponse {
+    /// Media sources
+    pub media_sources: Vec<MediaSourceInfo>,
+    /// Play session ID
+    pub play_session_id: Option<String>,
+    /// Error code
+    pub error_code: Option<String>,
+}
+
+/// Stream parameters for generating streaming URLs
 #[derive(Debug, Clone, Default)]
 pub struct StreamParams {
     /// Maximum streaming bitrate
@@ -1326,531 +1325,228 @@ pub struct StreamParams {
     pub audio_codec: Option<String>,
     /// Video codec
     pub video_codec: Option<String>,
-    /// Audio bitrate
-    pub audio_bitrate: Option<u32>,
-    /// Video bitrate
-    pub video_bitrate: Option<u32>,
-    /// Max audio channels
-    pub max_audio_channels: Option<u32>,
-    /// Max width
-    pub max_width: Option<u32>,
-    /// Max height
-    pub max_height: Option<u32>,
-    /// Start time in ticks
-    pub start_time_ticks: Option<i64>,
-    /// Device ID
-    pub device_id: Option<String>,
-    /// Media source ID
-    pub media_source_id: Option<String>,
-    /// Live stream ID
-    pub live_stream_id: Option<String>,
     /// Play session ID
     pub play_session_id: Option<String>,
+    /// Device profile ID
+    pub device_profile_id: Option<String>,
+    /// Static streaming (no transcoding)
+    pub static_streaming: Option<bool>,
+    /// Media source ID
+    pub media_source_id: Option<String>,
     /// Audio stream index
     pub audio_stream_index: Option<i32>,
-    /// Video stream index
-    pub video_stream_index: Option<i32>,
     /// Subtitle stream index
     pub subtitle_stream_index: Option<i32>,
-    /// Whether to enable direct play
-    pub enable_direct_play: Option<bool>,
-    /// Whether to enable direct stream
-    pub enable_direct_stream: Option<bool>,
-    /// Whether to enable transcoding
-    pub enable_transcoding: Option<bool>,
-    /// Allow video stream copy
-    pub allow_video_stream_copy: Option<bool>,
-    /// Allow audio stream copy
-    pub allow_audio_stream_copy: Option<bool>,
-    /// Break on non key frames
-    pub break_on_non_key_frames: Option<bool>,
-    /// Audio sample rate
-    pub audio_sample_rate: Option<u32>,
-    /// Max audio bit depth
-    pub max_audio_bit_depth: Option<u32>,
-    /// Max streaming bitrate
-    pub max_streaming_bitrate_2: Option<u32>,
-    /// Max frame rate
-    pub max_frame_rate: Option<f32>,
-    /// Profile
-    pub profile: Option<String>,
-    /// Level
-    pub level: Option<String>,
-    /// Framerate
-    pub framerate: Option<f32>,
-    /// Max ref frames
-    pub max_ref_frames: Option<i32>,
-    /// Max video bit depth
-    pub max_video_bit_depth: Option<u32>,
-    /// Require avc
-    pub require_avc: Option<bool>,
-    /// De interlace
-    pub de_interlace: Option<bool>,
-    /// Require non anamorphic
-    pub require_non_anamorphic: Option<bool>,
-    /// Transcoding max audio channels
-    pub transcoding_max_audio_channels: Option<u32>,
-    /// CPU core limit
-    pub cpu_core_limit: Option<u32>,
-    /// Live stream ID
-    pub live_stream_id_2: Option<String>,
-    /// Enable mpegts m2ts mode
-    pub enable_mpegts_m2ts_mode: Option<bool>,
-    /// Video codec
-    pub video_codec_2: Option<String>,
-    /// Subtitle codec
-    pub subtitle_codec: Option<String>,
-    /// Transcoding reasons
-    pub transcoding_reasons: Option<String>,
-    /// Audio stream index
-    pub audio_stream_index_2: Option<i32>,
-    /// Video stream index
-    pub video_stream_index_2: Option<i32>,
-    /// Context
-    pub context: Option<String>,
-    /// Stream options
-    pub stream_options: HashMap<String, String>,
+    /// Start time in ticks
+    pub start_time_ticks: Option<i64>,
+    /// Tag
+    pub tag: Option<String>,
 }
 
 impl StreamParams {
-    /// Create a new StreamParams builder
+    /// Create new empty stream parameters
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set maximum streaming bitrate
+    /// Convert to query string
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+
+        if let Some(bitrate) = self.max_streaming_bitrate {
+            params.push(format!("maxStreamingBitrate={}", bitrate));
+        }
+
+        if let Some(ref container) = self.container {
+            params.push(format!("container={}", urlencoding::encode(container)));
+        }
+
+        if let Some(ref audio_codec) = self.audio_codec {
+            params.push(format!("audioCodec={}", urlencoding::encode(audio_codec)));
+        }
+
+        if let Some(ref video_codec) = self.video_codec {
+            params.push(format!("videoCodec={}", urlencoding::encode(video_codec)));
+        }
+
+        if let Some(ref session_id) = self.play_session_id {
+            params.push(format!("playSessionId={}", urlencoding::encode(session_id)));
+        }
+
+        if let Some(ref profile_id) = self.device_profile_id {
+            params.push(format!("deviceProfileId={}", urlencoding::encode(profile_id)));
+        }
+
+        if let Some(static_val) = self.static_streaming {
+            params.push(format!("static={}", static_val));
+        }
+
+        if let Some(ref source_id) = self.media_source_id {
+            params.push(format!("mediaSourceId={}", urlencoding::encode(source_id)));
+        }
+
+        if let Some(audio_index) = self.audio_stream_index {
+            params.push(format!("audioStreamIndex={}", audio_index));
+        }
+
+        if let Some(subtitle_index) = self.subtitle_stream_index {
+            params.push(format!("subtitleStreamIndex={}", subtitle_index));
+        }
+
+        if let Some(start_ticks) = self.start_time_ticks {
+            params.push(format!("startTimeTicks={}", start_ticks));
+        }
+
+        if let Some(ref tag) = self.tag {
+            params.push(format!("tag={}", urlencoding::encode(tag)));
+        }
+
+        params.join("&")
+    }
+
+    /// Builder method to set max streaming bitrate
     pub fn max_streaming_bitrate(mut self, bitrate: u32) -> Self {
         self.max_streaming_bitrate = Some(bitrate);
         self
     }
 
-    /// Set container format
-    pub fn container<S: Into<String>>(mut self, container: S) -> Self {
-        self.container = Some(container.into());
+    /// Builder method to set container
+    pub fn container(mut self, container: String) -> Self {
+        self.container = Some(container);
         self
     }
 
-    /// Set audio codec
-    pub fn audio_codec<S: Into<String>>(mut self, codec: S) -> Self {
-        self.audio_codec = Some(codec.into());
+    /// Builder method to set play session ID
+    pub fn play_session_id(mut self, session_id: String) -> Self {
+        self.play_session_id = Some(session_id);
         self
     }
 
-    /// Set video codec
-    pub fn video_codec<S: Into<String>>(mut self, codec: S) -> Self {
-        self.video_codec = Some(codec.into());
+    /// Builder method to set static streaming
+    pub fn static_streaming(mut self, static_val: bool) -> Self {
+        self.static_streaming = Some(static_val);
         self
     }
 
-    /// Set audio bitrate
-    pub fn audio_bitrate(mut self, bitrate: u32) -> Self {
-        self.audio_bitrate = Some(bitrate);
+    /// Builder method to set media source ID
+    pub fn media_source_id(mut self, source_id: String) -> Self {
+        self.media_source_id = Some(source_id);
         self
-    }
-
-    /// Set video bitrate
-    pub fn video_bitrate(mut self, bitrate: u32) -> Self {
-        self.video_bitrate = Some(bitrate);
-        self
-    }
-
-    /// Set max audio channels
-    pub fn max_audio_channels(mut self, channels: u32) -> Self {
-        self.max_audio_channels = Some(channels);
-        self
-    }
-
-    /// Set max width
-    pub fn max_width(mut self, width: u32) -> Self {
-        self.max_width = Some(width);
-        self
-    }
-
-    /// Set max height
-    pub fn max_height(mut self, height: u32) -> Self {
-        self.max_height = Some(height);
-        self
-    }
-
-    /// Set start time in ticks
-    pub fn start_time_ticks(mut self, ticks: i64) -> Self {
-        self.start_time_ticks = Some(ticks);
-        self
-    }
-
-    /// Set device ID
-    pub fn device_id<S: Into<String>>(mut self, device_id: S) -> Self {
-        self.device_id = Some(device_id.into());
-        self
-    }
-
-    /// Set media source ID
-    pub fn media_source_id<S: Into<String>>(mut self, source_id: S) -> Self {
-        self.media_source_id = Some(source_id.into());
-        self
-    }
-
-    /// Set play session ID
-    pub fn play_session_id<S: Into<String>>(mut self, session_id: S) -> Self {
-        self.play_session_id = Some(session_id.into());
-        self
-    }
-
-    /// Set audio stream index
-    pub fn audio_stream_index(mut self, index: i32) -> Self {
-        self.audio_stream_index = Some(index);
-        self
-    }
-
-    /// Set video stream index
-    pub fn video_stream_index(mut self, index: i32) -> Self {
-        self.video_stream_index = Some(index);
-        self
-    }
-
-    /// Set subtitle stream index
-    pub fn subtitle_stream_index(mut self, index: i32) -> Self {
-        self.subtitle_stream_index = Some(index);
-        self
-    }
-
-    /// Enable direct play
-    pub fn enable_direct_play(mut self, enable: bool) -> Self {
-        self.enable_direct_play = Some(enable);
-        self
-    }
-
-    /// Enable direct stream
-    pub fn enable_direct_stream(mut self, enable: bool) -> Self {
-        self.enable_direct_stream = Some(enable);
-        self
-    }
-
-    /// Enable transcoding
-    pub fn enable_transcoding(mut self, enable: bool) -> Self {
-        self.enable_transcoding = Some(enable);
-        self
-    }
-
-    /// Add stream option
-    pub fn stream_option<K, V>(mut self, key: K, value: V) -> Self
-    where
-        K: Into<String>,
-        V: Into<String>,
-    {
-        self.stream_options.insert(key.into(), value.into());
-        self
-    }
-
-    /// Convert to query parameters for HTTP request
-    pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        if let Some(max_bitrate) = self.max_streaming_bitrate {
-            params.push(("MaxStreamingBitrate".to_string(), max_bitrate.to_string()));
-        }
-
-        if let Some(ref container) = self.container {
-            params.push(("Container".to_string(), container.clone()));
-        }
-
-        if let Some(ref audio_codec) = self.audio_codec {
-            params.push(("AudioCodec".to_string(), audio_codec.clone()));
-        }
-
-        if let Some(ref video_codec) = self.video_codec {
-            params.push(("VideoCodec".to_string(), video_codec.clone()));
-        }
-
-        if let Some(audio_bitrate) = self.audio_bitrate {
-            params.push(("AudioBitrate".to_string(), audio_bitrate.to_string()));
-        }
-
-        if let Some(video_bitrate) = self.video_bitrate {
-            params.push(("VideoBitrate".to_string(), video_bitrate.to_string()));
-        }
-
-        if let Some(max_audio_channels) = self.max_audio_channels {
-            params.push(("MaxAudioChannels".to_string(), max_audio_channels.to_string()));
-        }
-
-        if let Some(max_width) = self.max_width {
-            params.push(("MaxWidth".to_string(), max_width.to_string()));
-        }
-
-        if let Some(max_height) = self.max_height {
-            params.push(("MaxHeight".to_string(), max_height.to_string()));
-        }
-
-        if let Some(start_time_ticks) = self.start_time_ticks {
-            params.push(("StartTimeTicks".to_string(), start_time_ticks.to_string()));
-        }
-
-        if let Some(ref device_id) = self.device_id {
-            params.push(("DeviceId".to_string(), device_id.clone()));
-        }
-
-        if let Some(ref media_source_id) = self.media_source_id {
-            params.push(("MediaSourceId".to_string(), media_source_id.clone()));
-        }
-
-        if let Some(ref play_session_id) = self.play_session_id {
-            params.push(("PlaySessionId".to_string(), play_session_id.clone()));
-        }
-
-        if let Some(audio_stream_index) = self.audio_stream_index {
-            params.push(("AudioStreamIndex".to_string(), audio_stream_index.to_string()));
-        }
-
-        if let Some(video_stream_index) = self.video_stream_index {
-            params.push(("VideoStreamIndex".to_string(), video_stream_index.to_string()));
-        }
-
-        if let Some(subtitle_stream_index) = self.subtitle_stream_index {
-            params.push(("SubtitleStreamIndex".to_string(), subtitle_stream_index.to_string()));
-        }
-
-        if let Some(enable_direct_play) = self.enable_direct_play {
-            params.push(("EnableDirectPlay".to_string(), enable_direct_play.to_string()));
-        }
-
-        if let Some(enable_direct_stream) = self.enable_direct_stream {
-            params.push(("EnableDirectStream".to_string(), enable_direct_stream.to_string()));
-        }
-
-        if let Some(enable_transcoding) = self.enable_transcoding {
-            params.push(("EnableTranscoding".to_string(), enable_transcoding.to_string()));
-        }
-
-        // Add stream options
-        for (key, value) in &self.stream_options {
-            params.push((key.clone(), value.clone()));
-        }
-
-        params
     }
 }
 
-/// Search query parameters
-#[derive(Debug, Clone, Default)]
-pub struct SearchQuery {
-    /// Search term
-    pub search_term: String,
-    /// Include item types
-    pub include_item_types: Vec<String>,
-    /// Exclude item types
-    pub exclude_item_types: Vec<String>,
-    /// Media types
-    pub media_types: Vec<String>,
-    /// Parent ID
-    pub parent_id: Option<String>,
-    /// Whether to search people
-    pub include_people: bool,
-    /// Whether to search media
-    pub include_media: bool,
-    /// Whether to search genres
-    pub include_genres: bool,
-    /// Whether to search studios
-    pub include_studios: bool,
-    /// Whether to search artists
-    pub include_artists: bool,
-    /// Limit
-    pub limit: Option<u32>,
-    /// User ID
-    pub user_id: Option<String>,
-}
-
-impl SearchQuery {
-    /// Create a new search query
-    pub fn new<S: Into<String>>(search_term: S) -> Self {
-        Self {
-            search_term: search_term.into(),
-            include_people: true,
-            include_media: true,
-            include_genres: true,
-            include_studios: true,
-            include_artists: true,
-            ..Default::default()
-        }
-    }
-
-    /// Set search term
-    pub fn search_term<S: Into<String>>(mut self, term: S) -> Self {
-        self.search_term = term.into();
-        self
-    }
-
-    /// Add include item type
-    pub fn include_item_type<S: Into<String>>(mut self, item_type: S) -> Self {
-        self.include_item_types.push(item_type.into());
-        self
-    }
-
-    /// Set include item types
-    pub fn include_item_types<I, S>(mut self, item_types: I) -> Self
-    where
-        I: IntoIterator<Item=S>,
-        S: Into<String>,
-    {
-        self.include_item_types = item_types.into_iter().map(|s| s.into()).collect();
-        self
-    }
-
-    /// Set parent ID
-    pub fn parent_id<S: Into<String>>(mut self, parent_id: S) -> Self {
-        self.parent_id = Some(parent_id.into());
-        self
-    }
-
-    /// Set whether to include people in search
-    pub fn include_people(mut self, include: bool) -> Self {
-        self.include_people = include;
-        self
-    }
-
-    /// Set whether to include media in search
-    pub fn include_media(mut self, include: bool) -> Self {
-        self.include_media = include;
-        self
-    }
-
-    /// Set limit
-    pub fn limit(mut self, limit: u32) -> Self {
-        self.limit = Some(limit);
-        self
-    }
-
-    /// Set user ID
-    pub fn user_id<S: Into<String>>(mut self, user_id: S) -> Self {
-        self.user_id = Some(user_id.into());
-        self
-    }
-
-    /// Convert to query parameters for HTTP request
-    pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        params.push(("SearchTerm".to_string(), self.search_term.clone()));
-
-        if !self.include_item_types.is_empty() {
-            params.push((
-                "IncludeItemTypes".to_string(),
-                self.include_item_types.join(","),
-            ));
-        }
-
-        if !self.exclude_item_types.is_empty() {
-            params.push((
-                "ExcludeItemTypes".to_string(),
-                self.exclude_item_types.join(","),
-            ));
-        }
-
-        if let Some(ref parent_id) = self.parent_id {
-            params.push(("ParentId".to_string(), parent_id.clone()));
-        }
-
-        params.push(("IncludePeople".to_string(), self.include_people.to_string()));
-        params.push(("IncludeMedia".to_string(), self.include_media.to_string()));
-        params.push(("IncludeGenres".to_string(), self.include_genres.to_string()));
-        params.push(("IncludeStudios".to_string(), self.include_studios.to_string()));
-        params.push(("IncludeArtists".to_string(), self.include_artists.to_string()));
-
-        if let Some(limit) = self.limit {
-            params.push(("Limit".to_string(), limit.to_string()));
-        }
-
-        if let Some(ref user_id) = self.user_id {
-            params.push(("UserId".to_string(), user_id.clone()));
-        }
-
-        params
-    }
-}
-
-/// Response wrapper for items queries
+/// Playback start info for reporting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct ItemsResponse {
-    /// Items returned
-    pub items: Vec<BaseItem>,
-    /// Total record count
-    pub total_record_count: i32,
-    /// Start index
-    pub start_index: i32,
-}
-
-/// Response wrapper for search queries
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct SearchResponse {
-    /// Search hints
-    pub search_hints: Vec<SearchHint>,
-    /// Total record count
-    pub total_record_count: i32,
-}
-
-/// Search hint result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct SearchHint {
+pub struct PlaybackStartInfo {
+    /// Can seek
+    pub can_seek: bool,
+    /// Item
+    pub item: BaseItem,
     /// Item ID
     pub item_id: String,
-    /// ID
-    pub id: String,
-    /// Name
-    pub name: String,
-    /// Matched term
-    pub matched_term: Option<String>,
-    /// Index number
-    pub index_number: Option<i32>,
-    /// Production year
-    pub production_year: Option<i32>,
-    /// Parent index number
-    pub parent_index_number: Option<i32>,
-    /// Primary image tag
-    pub primary_image_tag: Option<String>,
-    /// Thumb image tag
-    pub thumb_image_tag: Option<String>,
-    /// Thumb image item ID
-    pub thumb_image_item_id: Option<String>,
-    /// Backdrop image tag
-    pub backdrop_image_tag: Option<String>,
-    /// Backdrop image item ID
-    pub backdrop_image_item_id: Option<String>,
-    /// Type
-    #[serde(rename = "Type")]
-    pub item_type: String,
-    /// Is folder
-    pub is_folder: Option<bool>,
-    /// Run time ticks
-    pub run_time_ticks: Option<i64>,
-    /// Media type
-    pub media_type: Option<String>,
-    /// Start date
-    pub start_date: Option<String>,
-    /// End date
-    pub end_date: Option<String>,
-    /// Series
-    pub series: Option<String>,
-    /// Status
-    pub status: Option<String>,
-    /// Album
-    pub album: Option<String>,
-    /// Album ID
-    pub album_id: Option<String>,
-    /// Album artist
-    pub album_artist: Option<String>,
-    /// Artists
-    pub artists: Vec<String>,
-    /// Song count
-    pub song_count: Option<i32>,
-    /// Episode count
-    pub episode_count: Option<i32>,
-    /// Channel ID
-    pub channel_id: Option<String>,
-    /// Channel name
-    pub channel_name: Option<String>,
-    /// Primary image aspect ratio
-    pub primary_image_aspect_ratio: Option<f64>,
+    /// Session ID
+    pub session_id: Option<String>,
+    /// Media source ID
+    pub media_source_id: String,
+    /// Audio stream index
+    pub audio_stream_index: Option<i32>,
+    /// Subtitle stream index
+    pub subtitle_stream_index: Option<i32>,
+    /// Is paused
+    pub is_paused: bool,
+    /// Is muted
+    pub is_muted: bool,
+    /// Position ticks
+    pub position_ticks: i64,
+    /// Volume level
+    pub volume_level: Option<i32>,
+    /// Brightness
+    pub brightness: Option<i32>,
+    /// Aspect ratio
+    pub aspect_ratio: Option<String>,
+    /// Play method
+    pub play_method: String,
+    /// Live stream ID
+    pub live_stream_id: Option<String>,
+    /// Play session ID
+    pub play_session_id: String,
+    /// Repeat mode
+    pub repeat_mode: String,
+    /// Now playing queue
+    pub now_playing_queue: Option<Vec<QueueItem>>,
+    /// Playlist item ID
+    pub playlist_item_id: Option<String>,
+}
+
+/// Playback progress info for reporting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackProgressInfo {
+    /// Can seek
+    pub can_seek: bool,
+    /// Item
+    pub item: Option<BaseItem>,
+    /// Item ID
+    pub item_id: String,
+    /// Session ID
+    pub session_id: Option<String>,
+    /// Media source ID
+    pub media_source_id: String,
+    /// Audio stream index
+    pub audio_stream_index: Option<i32>,
+    /// Subtitle stream index
+    pub subtitle_stream_index: Option<i32>,
+    /// Is paused
+    pub is_paused: bool,
+    /// Is muted
+    pub is_muted: bool,
+    /// Position ticks
+    pub position_ticks: i64,
+    /// Volume level
+    pub volume_level: Option<i32>,
+    /// Brightness
+    pub brightness: Option<i32>,
+    /// Aspect ratio
+    pub aspect_ratio: Option<String>,
+    /// Play method
+    pub play_method: String,
+    /// Live stream ID
+    pub live_stream_id: Option<String>,
+    /// Play session ID
+    pub play_session_id: String,
+    /// Repeat mode
+    pub repeat_mode: String,
+    /// Now playing queue
+    pub now_playing_queue: Option<Vec<QueueItem>>,
+    /// Playlist item ID
+    pub playlist_item_id: Option<String>,
+}
+
+/// Playback stop info for reporting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackStopInfo {
+    /// Item
+    pub item: Option<BaseItem>,
+    /// Item ID
+    pub item_id: String,
+    /// Session ID
+    pub session_id: Option<String>,
+    /// Media source ID
+    pub media_source_id: String,
+    /// Position ticks
+    pub position_ticks: i64,
+    /// Live stream ID
+    pub live_stream_id: Option<String>,
+    /// Play session ID
+    pub play_session_id: String,
+    /// Failed
+    pub failed: bool,
+    /// Next media type
+    pub next_media_type: Option<String>,
+    /// Playlist item ID
+    pub playlist_item_id: Option<String>,
+    /// Now playing queue
+    pub now_playing_queue: Option<Vec<QueueItem>>,
 }

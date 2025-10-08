@@ -526,6 +526,219 @@ impl JellyfinClient {
         self.get("/Users/Me").await
     }
 
+    // Library API methods
+
+    /// Get items from the library
+    ///
+    /// Retrieves items from the Jellyfin library based on query parameters.
+    /// This is the primary method for browsing and filtering library content.
+    /// Requires authentication.
+    pub async fn get_items(&self, params: &crate::models::api::ItemsQuery) -> Result<crate::models::api::ItemsResponse> {
+        info!("Getting items with query parameters");
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        // Build query string from parameters
+        let query_string = params.to_query_string();
+        let path = if query_string.is_empty() {
+            "/Items".to_string()
+        } else {
+            format!("/Items?{}", query_string)
+        };
+
+        debug!("Items query path: {}", path);
+        self.get(&path).await
+    }
+
+    /// Get a specific item by ID
+    ///
+    /// Retrieves detailed information about a specific library item.
+    /// Requires authentication.
+    pub async fn get_item(&self, item_id: &str) -> Result<crate::models::api::BaseItem> {
+        info!("Getting item with ID: {}", item_id);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        if item_id.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+        }
+
+        let path = format!("/Items/{}", item_id);
+        self.get(&path).await
+    }
+
+    /// Search for items in the library
+    ///
+    /// Performs a search across the library using the search hints endpoint.
+    /// This provides fast search results with basic item information.
+    /// Requires authentication.
+    pub async fn search(&self, query: &str, limit: Option<u32>) -> Result<crate::models::api::SearchHintResult> {
+        info!("Searching for: {}", query);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        if query.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Search query cannot be empty".to_string()).into());
+        }
+
+        // URL encode the search term
+        let encoded_query = urlencoding::encode(query);
+        let mut path = format!("/Search/Hints?searchTerm={}", encoded_query);
+
+        if let Some(limit_val) = limit {
+            path.push_str(&format!("&limit={}", limit_val));
+        }
+
+        debug!("Search path: {}", path);
+        self.get(&path).await
+    }
+
+    // Media streaming API methods
+
+    /// Get playback info for an item
+    ///
+    /// Retrieves playback information including media sources and streaming details
+    /// for a specific item. This is required before starting playback.
+    /// Requires authentication.
+    pub async fn get_playback_info(&self, item_id: &str, user_id: Option<&str>) -> Result<crate::models::api::PlaybackInfoResponse> {
+        info!("Getting playback info for item: {}", item_id);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        if item_id.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+        }
+
+        let mut path = format!("/Items/{}/PlaybackInfo", item_id);
+
+        if let Some(uid) = user_id {
+            path.push_str(&format!("?userId={}", urlencoding::encode(uid)));
+        }
+
+        debug!("Playback info path: {}", path);
+        self.get(&path).await
+    }
+
+    /// Get streaming URL for an item
+    ///
+    /// Generates a direct streaming URL for media playback. This method constructs
+    /// the URL but doesn't make an HTTP request - the URL is meant to be used
+    /// by media players for streaming.
+    pub fn get_stream_url(&self, item_id: &str, params: &crate::models::api::StreamParams) -> Result<String> {
+        info!("Generating stream URL for item: {}", item_id);
+
+        let server_url = self.server_url
+            .as_ref()
+            .ok_or_else(|| JellyfinError::InvalidUrl("No server URL set".to_string()))?;
+
+        if item_id.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+        }
+
+        let query_string = params.to_query_string();
+        let base_path = format!("/Videos/{}/stream", item_id);
+
+        let url = if query_string.is_empty() {
+            format!("{}{}", server_url, base_path)
+        } else {
+            format!("{}{}?{}", server_url, base_path, query_string)
+        };
+
+        debug!("Generated stream URL: {}", url);
+        Ok(url)
+    }
+
+    /// Get streaming URL with container format
+    ///
+    /// Generates a streaming URL with a specific container format extension.
+    /// This is useful for players that need specific file extensions.
+    pub fn get_stream_url_with_container(&self, item_id: &str, container: &str, params: &crate::models::api::StreamParams) -> Result<String> {
+        info!("Generating stream URL for item: {} with container: {}", item_id, container);
+
+        let server_url = self.server_url
+            .as_ref()
+            .ok_or_else(|| JellyfinError::InvalidUrl("No server URL set".to_string()))?;
+
+        if item_id.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+        }
+
+        if container.is_empty() {
+            return Err(JellyfinError::InvalidUrl("Container cannot be empty".to_string()).into());
+        }
+
+        let query_string = params.to_query_string();
+        let base_path = format!("/Videos/{}/stream.{}", item_id, container);
+
+        let url = if query_string.is_empty() {
+            format!("{}{}", server_url, base_path)
+        } else {
+            format!("{}{}?{}", server_url, base_path, query_string)
+        };
+
+        debug!("Generated stream URL with container: {}", url);
+        Ok(url)
+    }
+
+    /// Report playback start
+    ///
+    /// Reports to the server that playback has started for an item.
+    /// This is used for tracking watch history and updating user data.
+    /// Requires authentication.
+    pub async fn report_playback_start(&self, info: &crate::models::api::PlaybackStartInfo) -> Result<()> {
+        info!("Reporting playback start for item: {}", info.item_id);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        self.post::<_, serde_json::Value>("/Sessions/Playing", info).await?;
+        debug!("Playback start reported successfully");
+        Ok(())
+    }
+
+    /// Report playback progress
+    ///
+    /// Reports current playback progress to the server. This should be called
+    /// periodically during playback to update the user's watch position.
+    /// Requires authentication.
+    pub async fn report_playback_progress(&self, info: &crate::models::api::PlaybackProgressInfo) -> Result<()> {
+        info!("Reporting playback progress for item: {} at position: {}", info.item_id, info.position_ticks);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        self.post::<_, serde_json::Value>("/Sessions/Playing/Progress", info).await?;
+        debug!("Playback progress reported successfully");
+        Ok(())
+    }
+
+    /// Report playback stop
+    ///
+    /// Reports to the server that playback has stopped for an item.
+    /// This finalizes the watch session and updates user data.
+    /// Requires authentication.
+    pub async fn report_playback_stop(&self, info: &crate::models::api::PlaybackStopInfo) -> Result<()> {
+        info!("Reporting playback stop for item: {} at position: {}", info.item_id, info.position_ticks);
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        self.post::<_, serde_json::Value>("/Sessions/Playing/Stopped", info).await?;
+        debug!("Playback stop reported successfully");
+        Ok(())
+    }
+
     /// Refresh authentication token
     ///
     /// Note: Jellyfin doesn't have a traditional token refresh endpoint.
