@@ -14,6 +14,7 @@ smallvec = "1"
 
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
 
 # HTTP Client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
@@ -32,6 +33,9 @@ urlencoding = "2"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
 
 [profile.release]
 opt-level = 3

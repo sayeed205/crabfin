@@ -105,7 +105,7 @@ impl JellyfinApp {
                     y: px(11.0),
                 }),
             }),
-            app_id: Some("com.crabfin.app".to_string()),
+            app_id: Some("com.hitarashi.crabfin".to_string()),
             kind: WindowKind::Normal,
             ..Default::default()
         };
