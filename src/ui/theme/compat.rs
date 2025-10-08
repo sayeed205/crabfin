@@ -1,12 +1,8 @@
-//! Theme system for the application
-//!
-//! This module handles theme management, color schemes, and styling
-//! for the GPUI interface.
-
+use crate::ui::theme::{Color, MaterialPalette};
 use gpui::*;
 use serde::{Deserialize, Serialize};
 
-/// Application theme configuration
+/// Legacy theme structure for backward compatibility
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
     /// Primary background color
@@ -65,6 +61,31 @@ impl Theme {
             error: hsla(0.0, 0.8, 0.5, 1.0),                  // Red
         }
     }
+
+    /// Create theme from Material palette
+    pub fn from_material_palette(palette: &MaterialPalette, is_dark: bool) -> Self {
+        let surface_colors = palette.get_surface_colors(is_dark);
+        let text_colors = palette.get_text_colors(is_dark);
+        let accent_colors = palette.get_accent_colors(is_dark);
+
+        // Convert Color to Hsla
+        let to_hsla = |color: Color| -> Hsla {
+            let (h, s, l) = color.to_hsl();
+            hsla(h / 360.0, s, l, color.a)
+        };
+
+        Self {
+            background_primary: to_hsla(surface_colors.surface),
+            background_secondary: to_hsla(surface_colors.surface_variant),
+            text_primary: to_hsla(text_colors.primary),
+            text_secondary: to_hsla(text_colors.secondary),
+            accent: to_hsla(accent_colors.primary),
+            border: to_hsla(surface_colors.outline),
+            success: hsla(120.0, 0.6, if is_dark { 0.5 } else { 0.4 }, 1.0),
+            warning: hsla(45.0, 1.0, if is_dark { 0.6 } else { 0.5 }, 1.0),
+            error: to_hsla(accent_colors.error),
+        }
+    }
 }
 
 impl Global for Theme {}
@@ -72,9 +93,9 @@ impl Global for Theme {}
 /// Setup the theme system in the GPUI app
 pub fn setup_theme(cx: &mut App) {
     // For now, use the default dark theme
-    // TODO: Load theme from configuration or system preferences
+    // TODO: Integrate with the new Material 3 theme system
     let theme = Theme::default();
     cx.set_global(theme);
 
-    tracing::debug!("Theme system initialized");
+    tracing::debug!("Legacy theme system initialized");
 }
