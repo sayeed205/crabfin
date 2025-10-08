@@ -43,6 +43,10 @@ pub enum JellyfinError {
     /// SSL/TLS certificate error
     #[error("Certificate error: {0}")]
     Certificate(String),
+    
+    /// Generic error from anyhow
+    #[error("Internal error: {0}")]
+    Internal(#[from] anyhow::Error),
 }
 
 /// Standard Jellyfin API error response format
@@ -143,6 +147,7 @@ impl JellyfinError {
             }
             JellyfinError::Timeout(_) => true,
             JellyfinError::ServerUnreachable(_) => true,
+            JellyfinError::Internal(_) => false,
             _ => false,
         }
     }
@@ -152,6 +157,7 @@ impl JellyfinError {
         match self {
             JellyfinError::Authentication(_) => true,
             JellyfinError::Server { status, .. } => *status == 401,
+            JellyfinError::Internal(_) => false,
             _ => false,
         }
     }
@@ -201,6 +207,9 @@ impl JellyfinError {
             }
             JellyfinError::Certificate(_) => {
                 "SSL certificate error. Please check the server's certificate.".to_string()
+            }
+            JellyfinError::Internal(err) => {
+                format!("Internal error: {}", err)
             }
         }
     }
