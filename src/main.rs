@@ -1,35 +1,30 @@
+//! Crabfin - Jellyfin Native Client
+//! 
+//! A modern, native desktop application for accessing Jellyfin media servers
+//! built with Rust and GPUI.
+
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod app;
-mod auth;
 mod client;
-mod error;
+mod auth;
+mod ui;
 mod models;
 mod services;
-mod ui;
 mod utils;
-
-use app::JellyfinApp;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing subscriber for structured logging
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "crabfin=debug,info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
-    info!("Starting Crabfin");
-
-    // Run the application with proper error handling
-    match JellyfinApp::run().await {
-        Ok(()) => {
-            info!("Application exited successfully");
+    init_logging()?;
+    
+    info!("Starting Crabfin - Jellyfin Native Client");
+    
+    // Run the main application
+    match run_app().await {
+        Ok(_) => {
+            info!("Application shutdown successfully");
             Ok(())
         }
         Err(e) => {
@@ -37,4 +32,29 @@ async fn main() -> Result<()> {
             Err(e)
         }
     }
+}
+
+/// Initialize the tracing subscriber for logging
+fn init_logging() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "crabfin=info".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .try_init()
+        .map_err(|e| anyhow::anyhow!("Failed to initialize logging: {}", e))?;
+    
+    Ok(())
+}
+
+/// Main application entry point
+async fn run_app() -> Result<()> {
+    info!("Initializing application components");
+    
+    // TODO: Initialize GPUI app and other components
+    // This will be implemented in subsequent tasks
+    
+    info!("Application initialized successfully");
+    Ok(())
 }

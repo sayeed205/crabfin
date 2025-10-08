@@ -1,5 +1,5 @@
 [package]
-name = "Crabfin"
+name = "crabfin"
 version = "0.1.0"
 edition = "2024"
 description = "A native Jellyfin client built with Rust and GPUI"
@@ -25,6 +25,9 @@ serde_json = "1"
 # Error Handling
 anyhow = "1"
 thiserror = "2"
+
+# URL Encoding
+urlencoding = "2"
 
 # Logging
 tracing = "0.1"
