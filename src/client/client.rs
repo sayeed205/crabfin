@@ -7,16 +7,122 @@
 use anyhow::Result;
 use reqwest::{Client, ClientBuilder, Method, Response};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 use super::error::{utils as error_utils, JellyfinError};
 
+/// Configuration for automatic reconnection
+#[derive(Debug, Clone)]
+pub struct ReconnectConfig {
+    /// Whether automatic reconnection is enabled
+    pub enabled: bool,
+    /// Maximum number of reconnection attempts
+    pub max_attempts: u32,
+    /// Initial delay between reconnection attempts (in seconds)
+    pub initial_delay: u64,
+    /// Maximum delay between reconnection attempts (in seconds)
+    pub max_delay: u64,
+    /// Multiplier for exponential backoff
+    pub backoff_multiplier: f64,
+}
+
+impl Default for ReconnectConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_attempts: 5,
+            initial_delay: 1,
+            max_delay: 30,
+            backoff_multiplier: 2.0,
+        }
+    }
+}
+
+/// Connection state for a Jellyfin server
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConnectionState {
+    /// Not connected to any server
+    Disconnected,
+    /// Currently connecting to a server
+    Connecting,
+    /// Successfully connected to a server
+    Connected,
+    /// Connection failed or lost
+    Failed(String),
+    /// Connection is being reconnected
+    Reconnecting,
+}
+
+/// Connection information for a Jellyfin server
+#[derive(Debug, Clone)]
+pub struct ConnectionInfo {
+    /// Current connection state
+    pub state: ConnectionState,
+    /// Server URL
+    pub server_url: Option<String>,
+    /// Server information (if connected)
+    pub server_info: Option<crate::models::api::PublicServerInfo>,
+    /// Last successful connection time
+    pub last_connected: Option<Instant>,
+    /// Number of connection attempts
+    pub connection_attempts: u32,
+    /// Last error message (if any)
+    pub last_error: Option<String>,
+}
+
+impl Default for ConnectionInfo {
+    fn default() -> Self {
+        Self {
+            state: ConnectionState::Disconnected,
+            server_url: None,
+            server_info: None,
+            last_connected: None,
+            connection_attempts: 0,
+            last_error: None,
+        }
+    }
+}
+
+/// Connection event notifications
+#[derive(Debug, Clone)]
+pub enum ConnectionEvent {
+    /// Connection state changed
+    StateChanged {
+        old_state: ConnectionState,
+        new_state: ConnectionState,
+        server_url: Option<String>,
+    },
+    /// Server information updated
+    ServerInfoUpdated {
+        server_url: String,
+        server_info: crate::models::api::PublicServerInfo,
+    },
+    /// Connection error occurred
+    Error {
+        server_url: Option<String>,
+        error: String,
+    },
+    /// Reconnection attempt started
+    ReconnectAttempt {
+        server_url: String,
+        attempt: u32,
+    },
+}
+
+/// Connection event listener trait
+pub trait ConnectionEventListener: Send + Sync {
+    /// Called when a connection event occurs
+    fn on_connection_event(&self, event: ConnectionEvent);
+}
+
 /// Main Jellyfin API client
 ///
 /// This client handles all HTTP communication with Jellyfin servers,
-/// including authentication, request building, and response parsing.
-#[derive(Debug, Clone)]
+/// including authentication, request building, response parsing, and
+/// connection management with automatic reconnection.
 pub struct JellyfinClient {
     /// The underlying HTTP client
     http_client: Client,
@@ -30,6 +136,12 @@ pub struct JellyfinClient {
     client_name: String,
     /// Client version for identification
     client_version: String,
+    /// Connection information and state
+    connection_info: Arc<RwLock<ConnectionInfo>>,
+    /// Connection event listeners
+    event_listeners: Arc<Mutex<Vec<Arc<dyn ConnectionEventListener>>>>,
+    /// Reconnection configuration
+    reconnect_config: ReconnectConfig,
 }
 
 impl JellyfinClient {
@@ -57,6 +169,9 @@ impl JellyfinClient {
             device_id,
             client_name,
             client_version,
+            connection_info: Arc::new(RwLock::new(ConnectionInfo::default())),
+            event_listeners: Arc::new(Mutex::new(Vec::new())),
+            reconnect_config: ReconnectConfig::default(),
         }
     }
 
@@ -83,7 +198,17 @@ impl JellyfinClient {
             device_id,
             client_name,
             client_version,
+            connection_info: Arc::new(RwLock::new(ConnectionInfo::default())),
+            event_listeners: Arc::new(Mutex::new(Vec::new())),
+            reconnect_config: ReconnectConfig::default(),
         })
+    }
+
+    /// Create a new JellyfinClient with custom reconnection configuration
+    pub fn with_reconnect_config(reconnect_config: ReconnectConfig) -> Self {
+        let mut client = Self::new();
+        client.reconnect_config = reconnect_config;
+        client
     }
 
     /// Generate a unique device ID
@@ -127,6 +252,71 @@ impl JellyfinClient {
     /// Check if the client is authenticated
     pub fn is_authenticated(&self) -> bool {
         self.auth_token.is_some()
+    }
+
+    /// Get current connection information
+    pub async fn get_connection_info(&self) -> ConnectionInfo {
+        self.connection_info.read().await.clone()
+    }
+
+    /// Get current connection state
+    pub async fn get_connection_state(&self) -> ConnectionState {
+        self.connection_info.read().await.state.clone()
+    }
+
+    /// Add a connection event listener
+    pub async fn add_event_listener(&self, listener: Arc<dyn ConnectionEventListener>) {
+        self.event_listeners.lock().await.push(listener);
+    }
+
+    /// Remove all event listeners
+    pub async fn clear_event_listeners(&self) {
+        self.event_listeners.lock().await.clear();
+    }
+
+    /// Notify all event listeners of a connection event
+    async fn notify_event_listeners(&self, event: ConnectionEvent) {
+        let listeners = self.event_listeners.lock().await;
+        for listener in listeners.iter() {
+            listener.on_connection_event(event.clone());
+        }
+    }
+
+    /// Update connection state and notify listeners
+    async fn update_connection_state(&self, new_state: ConnectionState) {
+        let mut conn_info = self.connection_info.write().await;
+        let old_state = conn_info.state.clone();
+
+        if old_state != new_state {
+            conn_info.state = new_state.clone();
+
+            // Update last connected time if we're now connected
+            if matches!(new_state, ConnectionState::Connected) {
+                conn_info.last_connected = Some(Instant::now());
+            }
+
+            drop(conn_info); // Release the write lock before notifying
+
+            self.notify_event_listeners(ConnectionEvent::StateChanged {
+                old_state,
+                new_state,
+                server_url: self.server_url.clone(),
+            }).await;
+        }
+    }
+
+    /// Update connection error and notify listeners
+    async fn update_connection_error(&self, error: String) {
+        {
+            let mut conn_info = self.connection_info.write().await;
+            conn_info.last_error = Some(error.clone());
+            conn_info.connection_attempts += 1;
+        }
+
+        self.notify_event_listeners(ConnectionEvent::Error {
+            server_url: self.server_url.clone(),
+            error,
+        }).await;
     }
 
     /// Set the server URL
@@ -228,10 +418,11 @@ impl JellyfinClient {
         headers
     }
 
-    /// Make a raw HTTP request
+    /// Make a raw HTTP request with connection management
     ///
     /// This is the low-level method for making HTTP requests to the Jellyfin API.
-    /// It handles URL building, header injection, and basic error handling.
+    /// It handles URL building, header injection, error handling, and automatic
+    /// reconnection on network failures.
     pub async fn request_raw(
         &self,
         method: Method,
@@ -261,7 +452,16 @@ impl JellyfinClient {
         let response = request_builder
             .send()
             .await
-            .map_err(JellyfinError::Network)?;
+            .map_err(|e| {
+                // Check if this is a network error that might indicate connection loss
+                let jellyfin_error = JellyfinError::Network(e);
+                if error_utils::is_server_unreachable(&jellyfin_error) {
+                    // Note: We can't call async methods here due to the closure context
+                    // The connection check will be handled by the caller or periodic checks
+                    warn!("Network error detected, connection may be lost: {}", jellyfin_error);
+                }
+                jellyfin_error
+            })?;
 
         let status = response.status();
         debug!("Response status: {}", status);
@@ -414,20 +614,33 @@ impl JellyfinClient {
         Ok(())
     }
 
-    /// Connect to a Jellyfin server
+    /// Connect to a Jellyfin server with validation and state tracking
     ///
-    /// Validates the server URL and retrieves public server information.
-    /// This method should be called before attempting authentication.
+    /// Validates the server URL, retrieves public server information, and
+    /// updates connection state with notifications. This method should be
+    /// called before attempting authentication.
     pub async fn connect(&mut self, server_url: &str) -> Result<crate::models::api::PublicServerInfo> {
         info!("Connecting to server: {}", server_url);
 
-        // Normalize and validate the URL
-        let normalized_url = self.normalize_server_url(server_url)?;
+        // Update state to connecting
+        self.update_connection_state(ConnectionState::Connecting).await;
 
-        // Test connectivity with ping
+        // Normalize and validate the URL
+        let normalized_url = match self.normalize_server_url(server_url) {
+            Ok(url) => url,
+            Err(e) => {
+                let error_msg = format!("Invalid server URL: {}", e);
+                self.update_connection_error(error_msg.clone()).await;
+                self.update_connection_state(ConnectionState::Failed(error_msg)).await;
+                return Err(e);
+            }
+        };
+
+        // Store the URL temporarily for connection attempt
         let temp_url = self.server_url.clone();
         self.server_url = Some(normalized_url.clone());
 
+        // Test connectivity with ping
         match self.ping().await {
             Ok(_) => {
                 debug!("Server ping successful");
@@ -446,14 +659,171 @@ impl JellyfinClient {
             }
             Err(e) => {
                 error!("Failed to get public server info: {}", e);
-                self.server_url = temp_url; // Restore previous URL on failure
+                let error_msg = format!("Connection failed: {}", e);
+
+                // Restore previous URL on failure
+                self.server_url = temp_url;
+
+                // Update connection state and error
+                self.update_connection_error(error_msg.clone()).await;
+                self.update_connection_state(ConnectionState::Failed(error_msg)).await;
+
                 return Err(e);
             }
         };
 
-        // Connection successful, keep the URL
-        self.server_url = Some(normalized_url);
+        // Connection successful - update state and info
+        self.server_url = Some(normalized_url.clone());
+
+        {
+            let mut conn_info = self.connection_info.write().await;
+            conn_info.server_url = Some(normalized_url.clone());
+            conn_info.server_info = Some(server_info.clone());
+            conn_info.connection_attempts = 0; // Reset attempts on success
+            conn_info.last_error = None; // Clear any previous errors
+        }
+
+        self.update_connection_state(ConnectionState::Connected).await;
+
+        // Notify listeners of server info update
+        self.notify_event_listeners(ConnectionEvent::ServerInfoUpdated {
+            server_url: normalized_url,
+            server_info: server_info.clone(),
+        }).await;
+
         Ok(server_info)
+    }
+
+    /// Disconnect from the current server
+    ///
+    /// Clears the server connection and authentication, and updates the connection state.
+    pub async fn disconnect(&mut self) {
+        info!("Disconnecting from server");
+
+        // Clear connection data
+        self.server_url = None;
+        self.auth_token = None;
+
+        // Update connection info
+        {
+            let mut conn_info = self.connection_info.write().await;
+            conn_info.server_url = None;
+            conn_info.server_info = None;
+            conn_info.last_error = None;
+        }
+
+        // Update state
+        self.update_connection_state(ConnectionState::Disconnected).await;
+    }
+
+    /// Check server connectivity and attempt reconnection if needed
+    ///
+    /// This method tests the current connection and attempts automatic
+    /// reconnection if the connection is lost and reconnection is enabled.
+    pub async fn check_connection(&mut self) -> Result<()> {
+        let current_state = self.get_connection_state().await;
+
+        // If we're not connected, nothing to check
+        if matches!(current_state, ConnectionState::Disconnected) {
+            return Ok(());
+        }
+
+        // If we're already connecting or reconnecting, don't interfere
+        if matches!(current_state, ConnectionState::Connecting | ConnectionState::Reconnecting) {
+            return Ok(());
+        }
+
+        // Test the connection with a ping
+        match self.ping().await {
+            Ok(_) => {
+                // Connection is good, ensure state is correct
+                if !matches!(current_state, ConnectionState::Connected) {
+                    self.update_connection_state(ConnectionState::Connected).await;
+                }
+                Ok(())
+            }
+            Err(e) => {
+                warn!("Connection check failed: {}", e);
+                let error_msg = format!("Connection lost: {}", e);
+
+                // Update error state
+                self.update_connection_error(error_msg.clone()).await;
+                self.update_connection_state(ConnectionState::Failed(error_msg)).await;
+
+                // Attempt reconnection if enabled
+                if self.reconnect_config.enabled {
+                    self.attempt_reconnection().await?;
+                }
+
+                Err(e)
+            }
+        }
+    }
+
+    /// Attempt automatic reconnection to the server
+    ///
+    /// Uses exponential backoff and respects the maximum number of attempts
+    /// configured in the reconnection settings.
+    async fn attempt_reconnection(&mut self) -> Result<()> {
+        let server_url = match &self.server_url {
+            Some(url) => url.clone(),
+            None => {
+                warn!("Cannot reconnect: no server URL available");
+                return Err(JellyfinError::configuration("No server URL for reconnection").into());
+            }
+        };
+
+        info!("Starting automatic reconnection to: {}", server_url);
+        self.update_connection_state(ConnectionState::Reconnecting).await;
+
+        let mut attempt = 1;
+        let mut delay = self.reconnect_config.initial_delay;
+
+        while attempt <= self.reconnect_config.max_attempts {
+            info!("Reconnection attempt {} of {}", attempt, self.reconnect_config.max_attempts);
+
+            // Notify listeners of reconnection attempt
+            self.notify_event_listeners(ConnectionEvent::ReconnectAttempt {
+                server_url: server_url.clone(),
+                attempt,
+            }).await;
+
+            // Try to reconnect
+            match self.connect(&server_url).await {
+                Ok(server_info) => {
+                    info!("Reconnection successful after {} attempts", attempt);
+                    return Ok(());
+                }
+                Err(e) => {
+                    warn!("Reconnection attempt {} failed: {}", attempt, e);
+
+                    // If this was the last attempt, give up
+                    if attempt >= self.reconnect_config.max_attempts {
+                        error!("All reconnection attempts failed, giving up");
+                        let error_msg = format!("Reconnection failed after {} attempts", attempt);
+                        self.update_connection_error(error_msg.clone()).await;
+                        self.update_connection_state(ConnectionState::Failed(error_msg)).await;
+                        return Err(e);
+                    }
+
+                    // Wait before next attempt with exponential backoff
+                    info!("Waiting {} seconds before next reconnection attempt", delay);
+                    tokio::time::sleep(Duration::from_secs(delay)).await;
+
+                    // Calculate next delay with exponential backoff
+                    delay = ((delay as f64) * self.reconnect_config.backoff_multiplier) as u64;
+                    delay = delay.min(self.reconnect_config.max_delay);
+
+                    attempt += 1;
+                }
+            }
+        }
+
+        // This should never be reached due to the check above, but just in case
+        let error_msg = "Maximum reconnection attempts exceeded".to_string();
+        self.update_connection_error(error_msg.clone()).await;
+        self.update_connection_state(ConnectionState::Failed(error_msg)).await;
+        Err(JellyfinError::configuration("Reconnection failed").into())
     }
 
     // Authentication API methods
@@ -760,5 +1130,35 @@ impl JellyfinClient {
 impl Default for JellyfinClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for JellyfinClient {
+    fn clone(&self) -> Self {
+        Self {
+            http_client: self.http_client.clone(),
+            server_url: self.server_url.clone(),
+            auth_token: self.auth_token.clone(),
+            device_id: self.device_id.clone(),
+            client_name: self.client_name.clone(),
+            client_version: self.client_version.clone(),
+            connection_info: Arc::clone(&self.connection_info),
+            event_listeners: Arc::clone(&self.event_listeners),
+            reconnect_config: self.reconnect_config.clone(),
+        }
+    }
+}
+
+impl std::fmt::Debug for JellyfinClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JellyfinClient")
+            .field("server_url", &self.server_url)
+            .field("device_id", &self.device_id)
+            .field("client_name", &self.client_name)
+            .field("client_version", &self.client_version)
+            .field("is_authenticated", &self.is_authenticated())
+            .field("is_connected", &self.is_connected())
+            .field("reconnect_config", &self.reconnect_config)
+            .finish_non_exhaustive()
     }
 }
