@@ -1,12 +1,13 @@
 //! Crabfin - Jellyfin Native Client
-//! 
+//!
 //! A modern, native desktop application for accessing Jellyfin media servers
 //! built with Rust and GPUI.
 
 use anyhow::Result;
-use tracing::{info, error};
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod app;
 mod client;
 mod auth;
 mod ui;
@@ -18,9 +19,9 @@ mod utils;
 async fn main() -> Result<()> {
     // Initialize tracing subscriber for structured logging
     init_logging()?;
-    
+
     info!("Starting Crabfin - Jellyfin Native Client");
-    
+
     // Run the main application
     match run_app().await {
         Ok(_) => {
@@ -44,17 +45,17 @@ fn init_logging() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .try_init()
         .map_err(|e| anyhow::anyhow!("Failed to initialize logging: {}", e))?;
-    
+
     Ok(())
 }
 
 /// Main application entry point
 async fn run_app() -> Result<()> {
     info!("Initializing application components");
-    
-    // TODO: Initialize GPUI app and other components
-    // This will be implemented in subsequent tasks
-    
-    info!("Application initialized successfully");
+
+    // Run the GPUI application
+    app::run_jellyfin_app().await?;
+
+    info!("Application shutdown successfully");
     Ok(())
 }
