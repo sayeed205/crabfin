@@ -37,6 +37,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Date/Time
 chrono = { version = "0.4", features = ["serde"] }
 
+# ID Generation
+cuid2 = "0.1"
+
 [profile.release]
 opt-level = 3
 lto = true

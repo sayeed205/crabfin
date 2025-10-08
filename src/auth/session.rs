@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
 use super::{AuthManager, ServerConfig, UserConfig};
-use crate::client::{JellyfinApiClient, JellyfinClient};
+use crate::client::JellyfinClient;
 
 /// User session containing authentication information
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,40 +126,12 @@ impl AuthManager for SessionManager {
             .ok_or_else(|| anyhow::anyhow!("Server configuration not found: {}", server_id))?;
 
         // Create API client for this server
-        let client = JellyfinClient::new(server.url.clone())?;
+        let mut _client = JellyfinClient::new();
+        _client.set_server_url(&server.url)?;
 
-        // Authenticate with the server
-        let auth_result = client.authenticate(username, password).await?;
-
-        // Create user session
-        let session = UserSession::new(
-            server_id.to_string(),
-            auth_result.user.id.clone(),
-            auth_result.user.name.clone(),
-            auth_result.access_token,
-            server.name.clone(),
-            server.url.clone(),
-        );
-
-        // Store the session
-        self.sessions.insert(server_id.to_string(), session.clone());
-
-        // Update server last used
-        self.update_server_last_used(server_id);
-
-        // Update user configuration
-        if let Some(server_config) = self.servers.get_mut(server_id) {
-            let mut user_config = UserConfig::new(
-                auth_result.user.id,
-                auth_result.user.name,
-                server_id.to_string(),
-            );
-            user_config.update_last_login();
-            server_config.add_user(user_config);
-        }
-
-        info!("Authentication successful for user '{}' on server '{}'", username, server_id);
-        Ok(session)
+        // For now, we'll need to implement authentication in the next task
+        // This is a placeholder that will be replaced when we implement the auth API
+        todo!("Authentication will be implemented in task 3.2")
     }
 
     fn get_session(&self, server_id: &str) -> Option<&UserSession> {
