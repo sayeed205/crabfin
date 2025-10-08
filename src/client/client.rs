@@ -352,6 +352,196 @@ impl JellyfinClient {
     {
         self.request_json(Method::DELETE, path, None::<&()>).await
     }
+
+    // System API methods
+
+    /// Get server information
+    ///
+    /// Retrieves detailed information about the Jellyfin server.
+    /// Requires authentication.
+    pub async fn get_server_info(&self) -> Result<crate::models::api::ServerInfo> {
+        info!("Getting server information");
+        self.get("/System/Info").await
+    }
+
+    /// Get public server information
+    ///
+    /// Retrieves basic server information without requiring authentication.
+    /// This is useful for server discovery and initial connection validation.
+    pub async fn get_public_server_info(&self, server_url: &str) -> Result<crate::models::api::PublicServerInfo> {
+        info!("Getting public server information from: {}", server_url);
+
+        // Create a temporary client for this request since we might not be connected yet
+        let temp_url = self.normalize_server_url(server_url)?;
+        let full_url = format!("{}/System/Info/Public", temp_url);
+
+        let headers = self.create_headers();
+        let response = self.http_client
+            .get(&full_url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(JellyfinError::Network)?;
+
+        let status = response.status();
+        debug!("Public server info response status: {}", status);
+
+        if status.is_success() {
+            let response_text = response.text().await.map_err(JellyfinError::Network)?;
+            serde_json::from_str(&response_text).map_err(|e| {
+                error!("Failed to parse public server info JSON: {}", e);
+                error!("Response text: {}", response_text);
+                JellyfinError::Parsing(e).into()
+            })
+        } else {
+            let error = error_utils::response_to_error(response).await;
+            error_utils::log_error(&error, "get_public_server_info");
+            Err(error.into())
+        }
+    }
+
+    /// Ping the server
+    ///
+    /// Tests connectivity to the Jellyfin server. Returns success if the server
+    /// is reachable and responding.
+    pub async fn ping(&self) -> Result<()> {
+        info!("Pinging server");
+
+        let response = self.request_raw(Method::GET, "/System/Ping", None, None).await?;
+        let response_text = response.text().await.map_err(JellyfinError::Network)?;
+
+        debug!("Ping response: {}", response_text);
+        Ok(())
+    }
+
+    /// Connect to a Jellyfin server
+    ///
+    /// Validates the server URL and retrieves public server information.
+    /// This method should be called before attempting authentication.
+    pub async fn connect(&mut self, server_url: &str) -> Result<crate::models::api::PublicServerInfo> {
+        info!("Connecting to server: {}", server_url);
+
+        // Normalize and validate the URL
+        let normalized_url = self.normalize_server_url(server_url)?;
+
+        // Test connectivity with ping
+        let temp_url = self.server_url.clone();
+        self.server_url = Some(normalized_url.clone());
+
+        match self.ping().await {
+            Ok(_) => {
+                debug!("Server ping successful");
+            }
+            Err(e) => {
+                warn!("Server ping failed, but continuing: {}", e);
+                // Don't fail connection on ping failure, some servers might not support it
+            }
+        }
+
+        // Get public server information
+        let server_info = match self.get_public_server_info(&normalized_url).await {
+            Ok(info) => {
+                info!("Successfully connected to server: {} ({})", info.name, info.version);
+                info
+            }
+            Err(e) => {
+                error!("Failed to get public server info: {}", e);
+                self.server_url = temp_url; // Restore previous URL on failure
+                return Err(e);
+            }
+        };
+
+        // Connection successful, keep the URL
+        self.server_url = Some(normalized_url);
+        Ok(server_info)
+    }
+
+    // Authentication API methods
+
+    /// Authenticate with username and password
+    ///
+    /// Authenticates a user with the Jellyfin server using username and password.
+    /// On successful authentication, the access token is automatically stored
+    /// and will be included in subsequent API requests.
+    pub async fn authenticate(&mut self, username: &str, password: &str) -> Result<crate::models::api::AuthResponse> {
+        info!("Authenticating user: {}", username);
+
+        if self.server_url.is_none() {
+            return Err(JellyfinError::InvalidUrl("No server URL set. Call connect() first.".to_string()).into());
+        }
+
+        let auth_request = crate::models::api::AuthRequest::new(
+            username.to_string(),
+            password.to_string(),
+        );
+
+        match self.post::<_, crate::models::api::AuthResponse>("/Users/AuthenticateByName", &auth_request).await {
+            Ok(auth_response) => {
+                info!("Authentication successful for user: {}", auth_response.user.name);
+
+                // Store the access token for future requests
+                self.set_auth_token(auth_response.access_token.clone());
+
+                debug!("Access token stored, user ID: {}", auth_response.user.id);
+                Ok(auth_response)
+            }
+            Err(e) => {
+                error!("Authentication failed for user {}: {}", username, e);
+                // Clear any existing token on failed authentication
+                self.clear_auth_token();
+                Err(e)
+            }
+        }
+    }
+
+    /// Logout and clear authentication
+    ///
+    /// Clears the stored authentication token. This effectively logs out
+    /// the user from the client, though it doesn't invalidate the token
+    /// on the server side.
+    pub fn logout(&mut self) {
+        info!("Logging out user");
+        self.clear_auth_token();
+    }
+
+    /// Check if a valid authentication token is available
+    ///
+    /// This only checks if a token is stored locally. It doesn't validate
+    /// the token with the server.
+    pub fn has_valid_token(&self) -> bool {
+        self.auth_token.is_some()
+    }
+
+    /// Get current user information
+    ///
+    /// Retrieves information about the currently authenticated user.
+    /// Requires authentication.
+    pub async fn get_current_user(&self) -> Result<crate::models::api::UserInfo> {
+        info!("Getting current user information");
+
+        if !self.is_authenticated() {
+            return Err(JellyfinError::authentication("No authentication token available").into());
+        }
+
+        self.get("/Users/Me").await
+    }
+
+    /// Refresh authentication token
+    ///
+    /// Note: Jellyfin doesn't have a traditional token refresh endpoint.
+    /// This method will re-authenticate using stored credentials if available,
+    /// or return an error requiring manual re-authentication.
+    pub async fn refresh_token(&mut self) -> Result<()> {
+        warn!("Token refresh requested, but Jellyfin doesn't support token refresh");
+        warn!("Manual re-authentication required");
+
+        // Clear the current token since it's presumably invalid
+        self.clear_auth_token();
+
+        Err(JellyfinError::authentication(
+            "Token refresh not supported. Please re-authenticate manually."
+        ).into())
+    }
 }
 
 impl Default for JellyfinClient {

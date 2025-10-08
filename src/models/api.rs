@@ -48,6 +48,26 @@ pub struct PublicServerInfo {
     pub startup_wizard_completed: Option<bool>,
 }
 
+/// Authentication request for login endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct AuthRequest {
+    /// Username for authentication
+    pub username: String,
+    /// Password for authentication (plain text)
+    pub pw: String,
+}
+
+impl AuthRequest {
+    /// Create a new authentication request
+    pub fn new(username: String, password: String) -> Self {
+        Self {
+            username,
+            pw: password,
+        }
+    }
+}
+
 /// Authentication response from login endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -1608,25 +1628,6 @@ impl StreamParams {
         }
 
         params
-    }
-}
-
-/// Authentication request parameters
-#[derive(Debug, Clone)]
-pub struct AuthRequest {
-    /// Username
-    pub username: String,
-    /// Password
-    pub password: String,
-}
-
-impl AuthRequest {
-    /// Create a new authentication request
-    pub fn new<S: Into<String>>(username: S, password: S) -> Self {
-        Self {
-            username: username.into(),
-            password: password.into(),
-        }
     }
 }
 
