@@ -22,6 +22,7 @@ pub struct Button {
     variant: ButtonVariant,
     size: ButtonSize,
     icon: Option<Icon>, // Placeholder for Icon type if we have one, or just use AnyElement
+    tooltip: Option<SharedString>,
     on_click: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     disabled: bool,
     full_width: bool,
@@ -37,6 +38,7 @@ impl Button {
             variant: ButtonVariant::Filled,
             size: ButtonSize::Medium,
             icon: None,
+            tooltip: None,
             on_click: None,
             disabled: false,
             full_width: false,
@@ -50,6 +52,11 @@ impl Button {
 
     pub fn size(mut self, size: ButtonSize) -> Self {
         self.size = size;
+        self
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(tooltip.into());
         self
     }
 
@@ -122,6 +129,22 @@ impl RenderOnce for Button {
         if let Some(border) = border_color {
             el = el.border_1().border_color(border);
         }
+
+        // TODO: Re-enable tooltips once we figure out the AnyView conversion
+        // if let Some(tooltip) = self.tooltip {
+        //     el = el.tooltip(move |_, cx| {
+        //         let theme = cx.global::<Theme>();
+        //         div()
+        //             .px_2()
+        //             .py_1()
+        //             .bg(theme.on_surface())
+        //             .text_color(theme.surface())
+        //             .rounded_md()
+        //             .text_xs()
+        //             .child(tooltip.clone())
+        //             .into_any_element()
+        //     });
+        // }
 
         if !self.disabled {
             el = el

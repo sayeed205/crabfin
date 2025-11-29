@@ -33,18 +33,25 @@ pub struct ServerInfo {
 #[serde(rename_all = "PascalCase")]
 pub struct PublicServerInfo {
     /// Server unique identifier
+    #[serde(rename = "Id")]
     pub id: String,
     /// Server name
+    #[serde(rename = "ServerName")]
     pub name: String,
     /// Server version
+    #[serde(rename = "Version")]
     pub version: String,
     /// Product name
+    #[serde(rename = "ProductName")]
     pub product_name: Option<String>,
     /// Operating system
+    #[serde(rename = "OperatingSystem")]
     pub operating_system: Option<String>,
     /// Local address
+    #[serde(rename = "LocalAddress")]
     pub local_address: Option<String>,
     /// Startup wizard completed
+    #[serde(rename = "StartupWizardCompleted")]
     pub startup_wizard_completed: Option<bool>,
 }
 

@@ -645,13 +645,15 @@ impl CrabfinClient {
         self.server_url = Some(normalized_url.clone());
 
         // Test connectivity with ping
+        // We do this first to quickly fail if the server is completely unreachable
         match self.ping().await {
             Ok(_) => {
                 debug!("Server ping successful");
             }
             Err(e) => {
-                warn!("Server ping failed, but continuing: {}", e);
-                // Don't fail connection on ping failure, some servers might not support it
+                warn!("Server ping failed: {}", e);
+                // We continue even if ping fails, as some servers might block it,
+                // but we log it as a warning.
             }
         }
 

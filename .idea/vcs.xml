@@ -2,6 +2,7 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/inspirations/gpui-component" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/inspirations/material-colors" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/inspirations/matugen" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/inspirations/zed" vcs="Git" />

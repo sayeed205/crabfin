@@ -8,6 +8,8 @@ use crate::ui::theme::Theme;
 pub struct AddServerView {
     focus_handle: FocusHandle,
     input: Entity<TextInput>,
+    error_message: Option<String>,
+    is_connecting: bool,
     on_connect: Option<Box<dyn Fn(String, &mut Window, &mut Context<Self>) + 'static>>,
     on_cancel: Option<Box<dyn Fn(&mut Window, &mut Context<Self>) + 'static>>,
 }
@@ -22,9 +24,22 @@ impl AddServerView {
         Self {
             focus_handle: cx.focus_handle(),
             input,
+            error_message: None,
+            is_connecting: false,
             on_connect: None,
             on_cancel: None,
         }
+    }
+
+    pub fn set_error(&mut self, message: String, cx: &mut Context<Self>) {
+        self.error_message = Some(message);
+        self.is_connecting = false;
+        cx.notify();
+    }
+
+    pub fn set_connecting(&mut self, connecting: bool, cx: &mut Context<Self>) {
+        self.is_connecting = connecting;
+        cx.notify();
     }
 
     pub fn on_connect(mut self, handler: impl Fn(String, &mut Window, &mut Context<Self>) + 'static) -> Self {
@@ -66,6 +81,13 @@ impl Render for AddServerView {
                     .max_w(px(400.0))
                     .child(self.input.clone())
             )
+            .children(
+                self.error_message.as_ref().map(|msg| {
+                    div()
+                        .text_color(theme.error())
+                        .child(msg.clone())
+                })
+            )
             .child(
                 div()
                     .flex()
@@ -73,6 +95,7 @@ impl Render for AddServerView {
                     .child(
                         Button::new("Cancel")
                             .variant(ButtonVariant::Text)
+                            .disabled(self.is_connecting)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 if let Some(callback) = &this.on_cancel {
                                     callback(window, cx);
@@ -80,11 +103,18 @@ impl Render for AddServerView {
                             }))
                     )
                     .child(
-                        Button::new("Connect")
+                        Button::new(if self.is_connecting { "Connecting..." } else { "Connect" })
                             .variant(ButtonVariant::Filled)
+                            .disabled(self.is_connecting)
                             .on_click(cx.listener(|this, _, window, cx| {
+                                if this.is_connecting {
+                                    return;
+                                }
                                 let url = this.input.read(cx).content.to_string();
                                 if let Some(callback) = &this.on_connect {
+                                    this.is_connecting = true;
+                                    this.error_message = None;
+                                    cx.notify();
                                     callback(url, window, cx);
                                 }
                             }))

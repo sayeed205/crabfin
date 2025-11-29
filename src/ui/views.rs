@@ -68,11 +68,51 @@ impl MainView {
                 })
                 .on_connect(move |url, _window, cx| {
                     println!("Connecting to: {}", url);
-                    // TODO: Validate and add server
-                    weak_view_connect.update(cx, |view, cx| {
-                        view.state = ViewState::MainApp;
-                        cx.notify();
-                    }).ok();
+
+                    let main_view_weak = weak_view_connect.clone();
+                    let url_clone = url.clone();
+                    let add_view_entity = cx.entity().clone();
+                    cx.spawn(async move |_, mut cx| {
+                        // Create a temporary client for validation
+                        let mut client = crate::client::CrabfinClient::new();
+
+                        match client.connect(&url_clone).await {
+                            Ok(info) => {
+                                println!("Successfully connected to: {}", info.name);
+
+                                // Add server to settings
+                                let server_config = crate::models::server::ServerConfig::new(
+                                    info.id,
+                                    info.name,
+                                    url_clone.clone(),
+                                );
+
+                                let _ = main_view_weak.update(cx, |main_view, cx| {
+                                    let service_manager = cx.global::<ServiceManager>();
+                                    if let Some(settings_service) = service_manager.settings_service() {
+                                        let _ = cx.background_executor().spawn({
+                                            let settings_service = settings_service.clone();
+                                            let server_config = server_config.clone();
+                                            async move {
+                                                if let Err(e) = settings_service.add_server(server_config).await {
+                                                    eprintln!("Failed to save server: {}", e);
+                                                }
+                                            }
+                                        }).detach();
+                                    }
+
+                                    main_view.state = ViewState::MainApp;
+                                    cx.notify();
+                                });
+                            }
+                            Err(e) => {
+                                println!("Failed to connect: {}", e);
+                                let _ = add_view_entity.update(cx, |add_view, cx| {
+                                    add_view.set_error(format!("Connection failed: {}", e), cx);
+                                });
+                            }
+                        }
+                    }).detach();
                 })
         });
 

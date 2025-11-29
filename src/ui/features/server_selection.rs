@@ -66,6 +66,7 @@ impl Render for ServerSelectionView {
                     .children(
                         config.servers.iter().map(|server| {
                             let server_id = server.id.clone();
+                            let server_url = server.url.clone();
                             Button::new(server.name.clone())
                                 .variant(ButtonVariant::Tonal)
                                 .full_width()
@@ -74,6 +75,7 @@ impl Render for ServerSelectionView {
                                         callback(server_id.clone(), window, cx);
                                     }
                                 }))
+                                .with_tooltip(server_url)
                         })
                     )
             )
