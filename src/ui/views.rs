@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 use super::theme::Theme;
-use crate::auth::{AuthManager, SessionManager, UserSession};
+use crate::auth::{SessionManager, UserSession};
 
 /// Main application view that manages the overall UI state
 pub struct MainView {
@@ -230,13 +230,40 @@ impl MainView {
             .id("settings")
             .size_full()
             .flex()
-            .items_center()
-            .justify_center()
+            .flex_col()
             .child(
+                // Settings header
                 div()
-                    .text_xl()
-                    .text_color(theme.text_secondary)
-                    .child("Settings")
+                    .w_full()
+                    .h(px(60.0))
+                    .bg(theme.background_secondary)
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .flex()
+                    .items_center()
+                    .px_4()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.text_primary)
+                            .child("Settings")
+                    )
+            )
+            .child(
+                // Settings content - placeholder for theme settings
+                div()
+                    .flex_1()
+                    .w_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        div()
+                            .text_xl()
+                            .text_color(theme.text_secondary)
+                            .child("Theme settings UI components are now available in src/ui/theme/settings_ui.rs")
+                    )
             )
     }
 

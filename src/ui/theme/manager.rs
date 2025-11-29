@@ -5,7 +5,7 @@ use crate::ui::theme::{
 use anyhow::Result;
 use gpui::*;
 use std::path::PathBuf;
-use std::sync::Arc;
+
 
 /// Central coordinator for all theme operations
 ///
@@ -266,7 +266,7 @@ impl ThemeManager {
     pub fn setup_periodic_wallpaper_check(&self, cx: &mut App) -> Task<()> {
         let check_interval = std::time::Duration::from_secs(5); // Check every 5 seconds
 
-        cx.spawn(async move |mut cx| {
+        cx.spawn(async move |cx| {
             loop {
                 // Create a new timer for each iteration
                 let timer = cx.background_executor().timer(check_interval);
@@ -426,7 +426,7 @@ impl ThemeManager {
             // Create the periodic wallpaper checking task
             let check_interval = std::time::Duration::from_secs(5);
 
-            cx.spawn(async move |mut cx| {
+            cx.spawn(async move |cx| {
                 loop {
                     // Create a new timer for each iteration
                     let timer = cx.background_executor().timer(check_interval);
