@@ -12,10 +12,6 @@ use tracing::{debug, info};
 use crate::{
     models::{AppConfig, AppState},
     services::ServiceManager,
-    ui::{
-        components::MainWindow,
-        theme::setup_theme,
-    },
     utils::error::AppError,
 };
 
@@ -66,7 +62,7 @@ impl JellyfinApp {
         info!("Setting up application globals and services");
 
         // Setup theme system
-        setup_theme(cx);
+        crate::ui::theme::setup_theme(cx);
 
         // Initialize global app state
         let app_state = AppState::new(self.config.clone());
@@ -77,6 +73,9 @@ impl JellyfinApp {
 
         // Initialize service manager
         cx.set_global((*self.service_manager).clone());
+
+        // Initialize views actions
+        crate::ui::views::init(cx);
 
         debug!("Application initialization complete");
         Ok(())
@@ -117,15 +116,19 @@ impl JellyfinApp {
             cx.new(|cx| {
                 // Setup system appearance observation for this window
                 cx.observe_window_appearance(window, |_, window, cx| {
-                    use crate::ui::theme::ThemeContext;
+                    use crate::ui::theme::Theme;
+                    use material_colors::color::Argb;
 
                     let window_appearance = window.appearance();
                     let is_dark = matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark);
 
-                    // Update theme context if using system mode
-                    ThemeContext::update_global(cx, |theme_ctx| {
-                        theme_ctx.handle_system_theme_change(is_dark);
-                    });
+                    // Green 500: #4CAF50 -> 0xFF4CAF50
+                    let source_color = Argb::from_u32(0xFF4CAF50);
+                    let theme = Theme::new(source_color, is_dark);
+                    cx.set_global(theme);
+
+                    // Force redraw
+                    cx.notify();
 
                     info!("System appearance changed to: {}", if is_dark { "dark" } else { "light" });
                 }).detach();
@@ -136,7 +139,7 @@ impl JellyfinApp {
                     // TODO: Save application state and cleanup resources
                 }).detach();
 
-                MainWindow::new(cx)
+                crate::ui::views::MainView::new(cx)
             })
         })?;
 
