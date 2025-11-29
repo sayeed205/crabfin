@@ -13,6 +13,8 @@ use super::{ServerConfig, UserSession};
 pub struct AppConfig {
     /// List of configured servers
     pub servers: Vec<ServerConfig>,
+    /// ID of the currently active server
+    pub active_server_id: Option<String>,
     /// Currently active user session
     pub current_user: Option<UserSession>,
     /// UI-related settings
@@ -25,6 +27,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             servers: Vec::new(),
+            active_server_id: None,
             current_user: None,
             ui_settings: UiSettings::default(),
             preferences: AppPreferences::default(),

@@ -73,7 +73,12 @@ impl CrabfinApp {
 
         // Initialize service manager
         let mut service_manager = (*self.service_manager).clone();
-        service_manager.initialize()?;
+
+        // Block on async initialization to ensure settings are loaded before UI is created
+        cx.background_executor().block(async {
+            service_manager.initialize().await
+        })?;
+
         cx.set_global(service_manager);
 
         // Initialize views actions

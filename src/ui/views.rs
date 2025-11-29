@@ -2,6 +2,7 @@ use gpui::prelude::*;
 use gpui::*;
 
 use super::features::add_server::AddServerView;
+use super::features::auth::AuthView;
 use super::features::server_selection::ServerSelectionView;
 use super::theme::Theme;
 use crate::services::ServiceManager;
@@ -9,6 +10,7 @@ use crate::services::ServiceManager;
 enum ViewState {
     ServerSelection,
     AddServer,
+    Auth,
     MainApp,
 }
 
@@ -18,6 +20,7 @@ pub struct MainView {
     state: ViewState,
     server_selection_view: Entity<ServerSelectionView>,
     add_server_view: Entity<AddServerView>,
+    auth_view: Option<Entity<AuthView>>,
 }
 
 impl MainView {
@@ -26,14 +29,21 @@ impl MainView {
         let settings_service = service_manager.settings_service().expect("Settings service not initialized");
         let config = settings_service.get_config();
 
+        // Determine initial state based on saved configuration
         let initial_state = if config.servers.is_empty() {
+            // No servers configured, go to add server
             ViewState::AddServer
+        } else if let Some(_active_server_id) = &config.active_server_id {
+            // Has active server, go to auth
+            ViewState::Auth
         } else {
+            // Has servers but none selected, go to server selection
             ViewState::ServerSelection
         };
 
         let weak_view = cx.entity().downgrade();
 
+        // Setup server selection view
         let weak_view_for_selection = weak_view.clone();
         let server_selection_view = cx.new(|cx| {
             let weak_view_add = weak_view_for_selection.clone();
@@ -46,15 +56,35 @@ impl MainView {
                     }).ok();
                 })
                 .on_select_server(move |server_id, _window, cx| {
-                    println!("Selected server: {}", server_id);
-                    // TODO: Connect to server
-                    weak_view_select.update(cx, |view, cx| {
-                        view.state = ViewState::MainApp;
-                        cx.notify();
-                    }).ok();
+                    let weak_view = weak_view_select.clone();
+                    let server_id_clone = server_id.clone();
+
+                    cx.spawn(async move |_, mut cx| {
+                        let result = cx.update(|cx| {
+                            let service_manager = cx.global::<ServiceManager>();
+                            if let Some(settings_service) = service_manager.settings_service() {
+                                cx.background_executor().spawn({
+                                    let settings_service = settings_service.clone();
+                                    let server_id = server_id_clone.clone();
+                                    async move {
+                                        settings_service.set_active_server(server_id).await
+                                    }
+                                }).detach();
+                            }
+                        });
+
+                        if result.is_ok() {
+                            let _ = weak_view.update(cx, |view, cx| {
+                                view.create_auth_view(cx);
+                                view.state = ViewState::Auth;
+                                cx.notify();
+                            });
+                        }
+                    }).detach();
                 })
         });
 
+        // Setup add server view
         let weak_view_for_add = weak_view.clone();
         let add_server_view = cx.new(|cx| {
             let weak_view_cancel = weak_view_for_add.clone();
@@ -62,13 +92,18 @@ impl MainView {
             AddServerView::new(cx)
                 .on_cancel(move |_window, cx| {
                     weak_view_cancel.update(cx, |view, cx| {
-                        view.state = ViewState::ServerSelection;
+                        let service_manager = cx.global::<ServiceManager>();
+                        let settings_service = service_manager.settings_service().expect("Settings service not initialized");
+                        let config = settings_service.get_config();
+
+                        // Only go back to server selection if there are servers
+                        if !config.servers.is_empty() {
+                            view.state = ViewState::ServerSelection;
+                        }
                         cx.notify();
                     }).ok();
                 })
                 .on_connect(move |url, _window, cx| {
-                    println!("Connecting to: {}", url);
-
                     let main_view_weak = weak_view_connect.clone();
                     let url_clone = url.clone();
                     let add_view_entity = cx.entity().clone();
@@ -78,35 +113,41 @@ impl MainView {
 
                         match client.connect(&url_clone).await {
                             Ok(info) => {
-                                println!("Successfully connected to: {}", info.name);
-
                                 // Add server to settings
                                 let server_config = crate::models::server::ServerConfig::new(
-                                    info.id,
+                                    info.id.clone(),
                                     info.name,
                                     url_clone.clone(),
                                 );
 
+                                let server_id = info.id;
                                 let _ = main_view_weak.update(cx, |main_view, cx| {
                                     let service_manager = cx.global::<ServiceManager>();
                                     if let Some(settings_service) = service_manager.settings_service() {
-                                        let _ = cx.background_executor().spawn({
-                                            let settings_service = settings_service.clone();
-                                            let server_config = server_config.clone();
-                                            async move {
-                                                if let Err(e) = settings_service.add_server(server_config).await {
-                                                    eprintln!("Failed to save server: {}", e);
-                                                }
+                                        let settings_service_clone = settings_service.clone();
+                                        let server_config_clone = server_config.clone();
+                                        let server_id_clone = server_id.clone();
+
+                                        cx.background_executor().spawn(async move {
+                                            // Add server and set as active
+                                            if let Err(e) = settings_service_clone.add_server(server_config_clone).await {
+                                                eprintln!("Failed to save server: {}", e);
+                                                return;
+                                            }
+
+                                            if let Err(e) = settings_service_clone.set_active_server(server_id_clone).await {
+                                                eprintln!("Failed to set active server: {}", e);
                                             }
                                         }).detach();
                                     }
 
-                                    main_view.state = ViewState::MainApp;
+                                    // Navigate to auth view
+                                    main_view.create_auth_view(cx);
+                                    main_view.state = ViewState::Auth;
                                     cx.notify();
                                 });
                             }
                             Err(e) => {
-                                println!("Failed to connect: {}", e);
                                 let _ = add_view_entity.update(cx, |add_view, cx| {
                                     add_view.set_error(format!("Connection failed: {}", e), cx);
                                 });
@@ -116,11 +157,84 @@ impl MainView {
                 })
         });
 
-        Self {
+        let mut view = Self {
             focus_handle: cx.focus_handle(),
             state: initial_state,
             server_selection_view,
             add_server_view,
+            auth_view: None,
+        };
+
+        // Create auth view if needed
+        if matches!(view.state, ViewState::Auth) {
+            view.create_auth_view(cx);
+        }
+
+        view
+    }
+
+    fn create_auth_view(&mut self, cx: &mut Context<Self>) {
+        let service_manager = cx.global::<ServiceManager>();
+        let settings_service = service_manager.settings_service().expect("Settings service not initialized");
+        let active_server = settings_service.get_active_server();
+
+        if let Some(server) = active_server {
+            let weak_view = cx.entity().downgrade();
+
+            let auth_view = cx.new(|cx| {
+                let weak_view_back = weak_view.clone();
+                let weak_view_login = weak_view.clone();
+
+                AuthView::new(server.name.clone(), cx)
+                    .on_back(move |_window, cx| {
+                        weak_view_back.update(cx, |view, cx| {
+                            view.state = ViewState::ServerSelection;
+                            cx.notify();
+                        }).ok();
+                    })
+                    .on_login(move |username, password, _window, cx| {
+                        let weak_view = weak_view_login.clone();
+                        let auth_entity = cx.entity().clone();
+
+                        cx.spawn(async move |_, mut cx| {
+                            // Get server URL
+                            let server_url = cx.update(|cx| {
+                                let service_manager = cx.global::<ServiceManager>();
+                                let settings_service = service_manager.settings_service().expect("Settings service not initialized");
+                                settings_service.get_active_server().map(|s| s.url)
+                            }).ok().flatten();
+
+                            if let Some(url) = server_url {
+                                let mut client = crate::client::CrabfinClient::new();
+
+                                // First connect to server
+                                if let Err(e) = client.connect(&url).await {
+                                    let _ = auth_entity.update(cx, |auth_view, cx| {
+                                        auth_view.set_error(format!("Connection failed: {}", e), cx);
+                                    });
+                                    return;
+                                }
+
+                                // Then authenticate
+                                match client.authenticate(&username, &password).await {
+                                    Ok(_) => {
+                                        let _ = weak_view.update(cx, |view, cx| {
+                                            view.state = ViewState::MainApp;
+                                            cx.notify();
+                                        });
+                                    }
+                                    Err(e) => {
+                                        let _ = auth_entity.update(cx, |auth_view, cx| {
+                                            auth_view.set_error(format!("Authentication failed: {}", e), cx);
+                                        });
+                                    }
+                                }
+                            }
+                        }).detach();
+                    })
+            });
+
+            self.auth_view = Some(auth_view);
         }
     }
 }
@@ -137,9 +251,16 @@ impl Render for MainView {
             .bg(theme.background())
             .text_color(theme.on_background())
             .child(
-                match self.state {
+                match &self.state {
                     ViewState::ServerSelection => self.server_selection_view.clone().into_any_element(),
                     ViewState::AddServer => self.add_server_view.clone().into_any_element(),
+                    ViewState::Auth => {
+                        if let Some(auth_view) = &self.auth_view {
+                            auth_view.clone().into_any_element()
+                        } else {
+                            div().child("Loading...").into_any_element()
+                        }
+                    }
                     ViewState::MainApp => div().child("Main App Content").into_any_element(),
                 }
             )

@@ -108,4 +108,50 @@ impl SettingsService {
 
         self.save_settings().await
     }
+
+    /// Remove a server from the configuration
+    pub async fn remove_server(&self, server_id: &str) -> Result<()> {
+        tracing::info!("Removing server: {}", server_id);
+
+        {
+            let mut config = self.config.write().map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
+            config.servers.retain(|s| s.id != server_id);
+
+            // Clear active server if it was the removed one
+            if config.active_server_id.as_deref() == Some(server_id) {
+                config.active_server_id = None;
+            }
+        }
+
+        self.save_settings().await
+    }
+
+    /// Set the active server
+    pub async fn set_active_server(&self, server_id: String) -> Result<()> {
+        tracing::info!("Setting active server: {}", server_id);
+
+        {
+            let mut config = self.config.write().map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
+
+            // Verify server exists
+            if !config.servers.iter().any(|s| s.id == server_id) {
+                return Err(anyhow::anyhow!("Server not found"));
+            }
+
+            config.active_server_id = Some(server_id);
+        }
+
+        self.save_settings().await
+    }
+
+    /// Get the active server configuration
+    pub fn get_active_server(&self) -> Option<crate::models::ServerConfig> {
+        let config = self.config.read().unwrap();
+
+        if let Some(active_id) = &config.active_server_id {
+            config.servers.iter().find(|s| &s.id == active_id).cloned()
+        } else {
+            None
+        }
+    }
 }

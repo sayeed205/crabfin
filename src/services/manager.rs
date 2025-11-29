@@ -33,13 +33,18 @@ impl ServiceManager {
     }
 
     /// Initialize all services
-    pub fn initialize(&mut self) -> anyhow::Result<()> {
+    pub async fn initialize(&mut self) -> anyhow::Result<()> {
         tracing::info!("Initializing service manager");
 
         // Initialize settings service first as other services may depend on it
-        self.settings_service = Some(Arc::new(
+        let settings_service = Arc::new(
             crate::services::SettingsService::new(self.config.clone())?
-        ));
+        );
+
+        // Load settings from disk
+        settings_service.load_settings().await?;
+
+        self.settings_service = Some(settings_service);
 
         // Initialize library service
         self.library_service = Some(Arc::new(
