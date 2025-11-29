@@ -71,13 +71,16 @@ impl Theme {
     pub fn inverse_primary(&self) -> Hsla { self.color(self.scheme.inverse_primary) }
 }
 
-pub fn setup_theme(cx: &mut App) {
-    // Green 500: #4CAF50 -> 0xFF4CAF50
-    let source_color = Argb::from_u32(0xFF4CAF50);
+// Green 500: #4CAF50 -> 0xFF4CAF50
+pub const SEED_COLOR: Argb = Argb::from_u32(0xFF4CAF50);
 
+pub fn update_theme(cx: &mut App, is_dark: bool) {
+    let theme = Theme::new(SEED_COLOR, is_dark);
+    cx.set_global(theme);
+}
+
+pub fn setup_theme(cx: &mut App) {
     let window_appearance = cx.window_appearance();
     let is_dark = matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark);
-
-    let theme = Theme::new(source_color, is_dark);
-    cx.set_global(theme);
+    update_theme(cx, is_dark);
 }

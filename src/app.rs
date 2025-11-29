@@ -116,19 +116,11 @@ impl JellyfinApp {
             cx.new(|cx| {
                 // Setup system appearance observation for this window
                 cx.observe_window_appearance(window, |_, window, cx| {
-                    use crate::ui::theme::Theme;
-                    use material_colors::color::Argb;
-
                     let window_appearance = window.appearance();
                     let is_dark = matches!(window_appearance, WindowAppearance::Dark | WindowAppearance::VibrantDark);
 
-                    // Green 500: #4CAF50 -> 0xFF4CAF50
-                    let source_color = Argb::from_u32(0xFF4CAF50);
-                    let theme = Theme::new(source_color, is_dark);
-                    cx.set_global(theme);
-
-                    // Force redraw
-                    cx.notify();
+                    // Update theme using centralized logic
+                    crate::ui::theme::update_theme(cx, is_dark);
 
                     info!("System appearance changed to: {}", if is_dark { "dark" } else { "light" });
                 }).detach();
