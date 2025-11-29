@@ -1,20 +1,30 @@
+use gpui::prelude::*;
 use gpui::*;
 
-
 use super::components::ui::button::{Button, ButtonVariant};
+use super::components::ui::text_input::TextInput;
 use super::theme::Theme;
 
 
 /// Main application view that manages the overall UI state
 pub struct MainView {
     focus_handle: FocusHandle,
-
+    input_view: Entity<TextInput>,
 }
 
 impl MainView {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let input_view = cx.new(|cx| {
+            TextInput::new(cx)
+                .with_placeholder("Enter your username")
+                .on_change(|value, _, _| {
+                    println!("Input changed: {}", value);
+                })
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
+            input_view,
         }
     }
 }
@@ -35,12 +45,6 @@ impl Render for MainView {
             .items_center()
             .justify_center()
             .gap_4()
-            .child(
-                div()
-                    .text_2xl()
-                    .font_weight(FontWeight::BOLD)
-                    .child("Component Test")
-            )
             .child(
                 div()
                     .flex()
@@ -65,6 +69,12 @@ impl Render for MainView {
                             .variant(ButtonVariant::Text)
                             .on_click(|_, _, _| println!("Text clicked"))
                     )
+            )
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(300.0))
+                    .child(self.input_view.clone())
             )
     }
 }

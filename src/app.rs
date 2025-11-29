@@ -76,6 +76,7 @@ impl JellyfinApp {
 
         // Initialize views actions
         crate::ui::views::init(cx);
+        crate::ui::components::ui::text_input::init(cx);
 
         debug!("Application initialization complete");
         Ok(())

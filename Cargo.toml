@@ -50,6 +50,7 @@ dirs = "6"
 
 # Wallpaper detection
 wallpaper = "3"
+unicode-segmentation = "1.12.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.55"
