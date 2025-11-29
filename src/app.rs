@@ -72,7 +72,9 @@ impl CrabfinApp {
         self.register_global_actions(cx);
 
         // Initialize service manager
-        cx.set_global((*self.service_manager).clone());
+        let mut service_manager = (*self.service_manager).clone();
+        service_manager.initialize()?;
+        cx.set_global(service_manager);
 
         // Initialize views actions
         crate::ui::views::init(cx);

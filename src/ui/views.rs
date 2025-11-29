@@ -1,30 +1,86 @@
 use gpui::prelude::*;
 use gpui::*;
 
-use super::components::ui::button::{Button, ButtonVariant};
-use super::components::ui::text_input::TextInput;
+use super::features::add_server::AddServerView;
+use super::features::server_selection::ServerSelectionView;
 use super::theme::Theme;
+use crate::services::ServiceManager;
 
+enum ViewState {
+    ServerSelection,
+    AddServer,
+    MainApp,
+}
 
 /// Main application view that manages the overall UI state
 pub struct MainView {
     focus_handle: FocusHandle,
-    input_view: Entity<TextInput>,
+    state: ViewState,
+    server_selection_view: Entity<ServerSelectionView>,
+    add_server_view: Entity<AddServerView>,
 }
 
 impl MainView {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let input_view = cx.new(|cx| {
-            TextInput::new(cx)
-                .with_placeholder("Enter your username")
-                .on_change(|value, _, _| {
-                    println!("Input changed: {}", value);
+        let service_manager = cx.global::<ServiceManager>();
+        let settings_service = service_manager.settings_service().expect("Settings service not initialized");
+        let config = settings_service.get_config();
+
+        let initial_state = if config.servers.is_empty() {
+            ViewState::AddServer
+        } else {
+            ViewState::ServerSelection
+        };
+
+        let weak_view = cx.entity().downgrade();
+
+        let weak_view_for_selection = weak_view.clone();
+        let server_selection_view = cx.new(|cx| {
+            let weak_view_add = weak_view_for_selection.clone();
+            let weak_view_select = weak_view_for_selection.clone();
+            ServerSelectionView::new(cx)
+                .on_add_server(move |_window, cx| {
+                    weak_view_add.update(cx, |view, cx| {
+                        view.state = ViewState::AddServer;
+                        cx.notify();
+                    }).ok();
+                })
+                .on_select_server(move |server_id, _window, cx| {
+                    println!("Selected server: {}", server_id);
+                    // TODO: Connect to server
+                    weak_view_select.update(cx, |view, cx| {
+                        view.state = ViewState::MainApp;
+                        cx.notify();
+                    }).ok();
+                })
+        });
+
+        let weak_view_for_add = weak_view.clone();
+        let add_server_view = cx.new(|cx| {
+            let weak_view_cancel = weak_view_for_add.clone();
+            let weak_view_connect = weak_view_for_add.clone();
+            AddServerView::new(cx)
+                .on_cancel(move |_window, cx| {
+                    weak_view_cancel.update(cx, |view, cx| {
+                        view.state = ViewState::ServerSelection;
+                        cx.notify();
+                    }).ok();
+                })
+                .on_connect(move |url, _window, cx| {
+                    println!("Connecting to: {}", url);
+                    // TODO: Validate and add server
+                    weak_view_connect.update(cx, |view, cx| {
+                        view.state = ViewState::MainApp;
+                        cx.notify();
+                    }).ok();
                 })
         });
 
         Self {
             focus_handle: cx.focus_handle(),
-            input_view,
+            state: initial_state,
+            server_selection_view,
+            add_server_view,
         }
     }
 }
@@ -40,41 +96,12 @@ impl Render for MainView {
             .size_full()
             .bg(theme.background())
             .text_color(theme.on_background())
-            .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap_4()
             .child(
-                div()
-                    .flex()
-                    .gap_4()
-                    .child(
-                        Button::new("Filled Button")
-                            .variant(ButtonVariant::Filled)
-                            .on_click(|_, _, _| println!("Filled clicked"))
-                    )
-                    .child(
-                        Button::new("Tonal Button")
-                            .variant(ButtonVariant::Tonal)
-                            .on_click(|_, _, _| println!("Tonal clicked"))
-                    )
-                    .child(
-                        Button::new("Outlined Button")
-                            .variant(ButtonVariant::Outlined)
-                            .on_click(|_, _, _| println!("Outlined clicked"))
-                    )
-                    .child(
-                        Button::new("Text Button")
-                            .variant(ButtonVariant::Text)
-                            .on_click(|_, _, _| println!("Text clicked"))
-                    )
-            )
-            .child(
-                div()
-                    .w_full()
-                    .max_w(px(300.0))
-                    .child(self.input_view.clone())
+                match self.state {
+                    ViewState::ServerSelection => self.server_selection_view.clone().into_any_element(),
+                    ViewState::AddServer => self.add_server_view.clone().into_any_element(),
+                    ViewState::MainApp => div().child("Main App Content").into_any_element(),
+                }
             )
     }
 }
