@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
 use super::{AuthManager, ServerConfig, UserConfig};
-use crate::client::JellyfinClient;
+use crate::client::CrabfinClient;
 
 /// User session containing authentication information
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ impl UserSession {
             server_name,
             server_url,
             created_at: chrono::Utc::now(),
-            expires_at: None, // Jellyfin tokens typically don't expire
+            expires_at: None, // Crabfin tokens typically don't expire
             is_active: true,
         }
     }
@@ -126,7 +126,7 @@ impl AuthManager for SessionManager {
             .ok_or_else(|| anyhow::anyhow!("Server configuration not found: {}", server_id))?;
 
         // Create API client for this server
-        let mut _client = JellyfinClient::new();
+        let mut _client = CrabfinClient::new();
         _client.set_server_url(&server.url)?;
 
         // For now, we'll need to implement authentication in the next task
@@ -157,7 +157,7 @@ impl AuthManager for SessionManager {
     async fn refresh_session(&mut self, server_id: &str) -> Result<()> {
         debug!("Refreshing session for server: {}", server_id);
 
-        // For now, Jellyfin tokens typically don't need refreshing
+        // For now, tokens typically don't need refreshing
         // This is a placeholder for future implementation if needed
         warn!("Session refresh not implemented yet for server: {}", server_id);
 

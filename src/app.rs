@@ -1,6 +1,6 @@
 //! Main application structure and GPUI app lifecycle management
 //!
-//! This module contains the core JellyfinApp struct and handles the GPUI
+//! This module contains the core CrabfinApp struct and handles the GPUI
 //! application lifecycle, window management, and global state initialization.
 
 use std::sync::Arc;
@@ -16,15 +16,15 @@ use crate::{
 };
 
 /// Main application struct that manages the GPUI app lifecycle
-pub struct JellyfinApp {
+pub struct CrabfinApp {
     /// Application configuration
     config: Arc<AppConfig>,
     /// Service manager for handling business logic
     service_manager: Arc<ServiceManager>,
 }
 
-impl JellyfinApp {
-    /// Create a new JellyfinApp instance
+impl CrabfinApp {
+    /// Create a new CrabfinApp instance
     pub fn new() -> Self {
         let config = Arc::new(AppConfig::default());
         let service_manager = Arc::new(ServiceManager::new(config.clone()));
@@ -98,7 +98,7 @@ impl JellyfinApp {
             window_decorations: Some(WindowDecorations::Client),
             window_min_size: Some(size(px(800.0), px(600.0))),
             titlebar: Some(TitlebarOptions {
-                title: Some(SharedString::from("Crabfin - Jellyfin Client")),
+                title: Some(SharedString::from("Crabfin")),
                 appears_transparent: true,
                 traffic_light_position: Some(Point {
                     x: px(12.0),
@@ -111,7 +111,7 @@ impl JellyfinApp {
         };
 
         cx.open_window(window_options, |window, cx| {
-            window.set_window_title("Crabfin - Jellyfin Client");
+            window.set_window_title("Crabfin");
 
             // Create the main window component
             cx.new(|cx| {
@@ -152,18 +152,18 @@ impl JellyfinApp {
     }
 }
 
-impl Default for JellyfinApp {
+impl Default for CrabfinApp {
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// Global trait implementation for accessing the app instance
-impl Global for JellyfinApp {}
+impl Global for CrabfinApp {}
 
-/// Initialize and run the Jellyfin application
-pub async fn run_jellyfin_app() -> Result<()> {
-    JellyfinApp::run().await.map_err(|e| {
+/// Initialize and run the Crabfin application
+pub async fn run_crabfin_app() -> Result<()> {
+    CrabfinApp::run().await.map_err(|e| {
         AppError::InitializationError(format!("Failed to run GPUI application: {}", e)).into()
     })
 }

@@ -1,12 +1,12 @@
-//! Jellyfin API response models
+//! API response models
 //!
-//! This module contains data structures that directly map to Jellyfin API responses.
+//! This module contains data structures that directly map to API responses.
 //! These are separate from the application's internal models to maintain clear boundaries.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Server information response from Jellyfin API
+/// Server information response from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ServerInfo {

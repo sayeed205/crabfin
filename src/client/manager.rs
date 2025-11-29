@@ -1,6 +1,6 @@
 //! Client manager for multi-server support
 //!
-//! This module provides a ClientManager that can handle multiple Jellyfin server
+//! This module provides a ClientManager that can handle multiple server
 //! connections simultaneously, with server switching, state isolation, and
 //! connection pooling for efficient resource usage.
 
@@ -10,16 +10,16 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
-use super::client::{ConnectionEvent, ConnectionEventListener, JellyfinClient, ReconnectConfig};
-use super::error::JellyfinError;
+use super::client::{ConnectionEvent, ConnectionEventListener, CrabfinClient, ReconnectConfig};
+use super::error::CrabfinError;
 use crate::models::api::PublicServerInfo;
 use crate::models::server::ServerConfig;
 
 /// Server connection pool entry
 #[derive(Debug)]
 struct PooledConnection {
-    /// The Jellyfin client instance
-    client: JellyfinClient,
+    /// The client instance
+    client: CrabfinClient,
     /// Whether this connection is currently active
     is_active: bool,
     /// Reference count for connection sharing
@@ -30,7 +30,7 @@ struct PooledConnection {
 
 /// Multi-server client manager
 ///
-/// This manager handles multiple Jellyfin server connections, providing
+/// This manager handles multiple server connections, providing
 /// server switching, state isolation, and efficient connection pooling.
 pub struct ClientManager {
     /// Pool of server connections indexed by server ID
@@ -177,14 +177,14 @@ impl ClientManager {
         {
             let pool = self.connection_pool.read().await;
             if pool.contains_key(&server_id) {
-                return Err(JellyfinError::configuration(
+                return Err(CrabfinError::configuration(
                     format!("Server with ID '{}' already exists", server_id)
                 ).into());
             }
         }
 
         // Create a new client with the default reconnect config
-        let client = JellyfinClient::with_reconnect_config(self.default_reconnect_config.clone());
+        let client = CrabfinClient::with_reconnect_config(self.default_reconnect_config.clone());
 
         // Set up event forwarding
         let forwarder = Arc::new(ConnectionEventForwarder {
@@ -255,7 +255,7 @@ impl ClientManager {
 
                 Ok(())
             }
-            None => Err(JellyfinError::configuration(
+            None => Err(CrabfinError::configuration(
                 format!("Server with ID '{}' not found", server_id)
             ).into()),
         }
@@ -276,7 +276,7 @@ impl ClientManager {
                     pooled_conn.client.connect(server_url).await?
                 }
                 None => {
-                    return Err(JellyfinError::configuration(
+                    return Err(CrabfinError::configuration(
                         format!("Server with ID '{}' not found in pool", server_id)
                     ).into());
                 }
@@ -309,7 +309,7 @@ impl ClientManager {
                     pooled_conn.is_active = false;
                 }
                 None => {
-                    return Err(JellyfinError::configuration(
+                    return Err(CrabfinError::configuration(
                         format!("Server with ID '{}' not found in pool", server_id)
                     ).into());
                 }
@@ -341,13 +341,13 @@ impl ClientManager {
             match pool.get(server_id) {
                 Some(pooled_conn) => {
                     if !pooled_conn.client.is_connected() {
-                        return Err(JellyfinError::configuration(
+                        return Err(CrabfinError::configuration(
                             format!("Server '{}' is not connected", server_id)
                         ).into());
                     }
                 }
                 None => {
-                    return Err(JellyfinError::configuration(
+                    return Err(CrabfinError::configuration(
                         format!("Server with ID '{}' not found in pool", server_id)
                     ).into());
                 }
@@ -397,12 +397,12 @@ impl ClientManager {
     ///
     /// Returns a clone of the client for the currently active server.
     /// The client can be used for API operations.
-    pub async fn get_active_client(&self) -> Result<JellyfinClient> {
+    pub async fn get_active_client(&self) -> Result<CrabfinClient> {
         let active_id = self.active_server_id.read().await.clone();
 
         match active_id {
             Some(server_id) => self.get_client(&server_id).await,
-            None => Err(JellyfinError::configuration("No active server set").into()),
+            None => Err(CrabfinError::configuration("No active server set").into()),
         }
     }
 
@@ -410,7 +410,7 @@ impl ClientManager {
     ///
     /// Returns a clone of the client for the specified server.
     /// The server must be in the pool.
-    pub async fn get_client(&self, server_id: &str) -> Result<JellyfinClient> {
+    pub async fn get_client(&self, server_id: &str) -> Result<CrabfinClient> {
         let pool = self.connection_pool.read().await;
 
         match pool.get(server_id) {
@@ -419,7 +419,7 @@ impl ClientManager {
                 // Note: In a real implementation, you might want to track this more carefully
                 Ok(pooled_conn.client.clone())
             }
-            None => Err(JellyfinError::configuration(
+            None => Err(CrabfinError::configuration(
                 format!("Server with ID '{}' not found in pool", server_id)
             ).into()),
         }
@@ -600,10 +600,10 @@ impl ClientManager {
     ///
     /// This method returns a client for the specified server, connecting
     /// to the server if not already connected.
-    pub async fn get_or_connect_client(&self, server_id: &str) -> Result<JellyfinClient> {
+    pub async fn get_or_connect_client(&self, server_id: &str) -> Result<CrabfinClient> {
         // Check if server exists in pool
         if self.get_server_config(server_id).await.is_none() {
-            return Err(JellyfinError::configuration(
+            return Err(CrabfinError::configuration(
                 format!("Server with ID '{}' not found in pool", server_id)
             ).into());
         }

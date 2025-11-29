@@ -1,6 +1,6 @@
-//! Crabfin - Jellyfin Native Client
+//! Crabfin - Native Client
 //!
-//! A modern, native desktop application for accessing Jellyfin media servers
+//! A modern, native desktop application for accessing media servers
 //! built with Rust and GPUI.
 
 use anyhow::Result;
@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     // Initialize tracing subscriber for structured logging
     init_logging()?;
 
-    info!("Starting Crabfin - Jellyfin Native Client");
+    info!("Starting Crabfin - Native Client");
 
     // Run the main application
     match run_app().await {
@@ -54,7 +54,7 @@ async fn run_app() -> Result<()> {
     info!("Initializing application components");
 
     // Run the GPUI application
-    app::run_jellyfin_app().await?;
+    app::run_crabfin_app().await?;
 
     info!("Application shutdown successfully");
     Ok(())

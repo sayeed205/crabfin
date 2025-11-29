@@ -1,6 +1,6 @@
-//! Jellyfin API client module
+//! Crabfin API client module
 //!
-//! This module handles all communication with Jellyfin servers,
+//! This module handles all communication with servers,
 //! including authentication, API requests, response parsing, and
 //! multi-server connection management.
 

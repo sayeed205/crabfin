@@ -1,20 +1,20 @@
-//! Error handling types and utilities for the Jellyfin API client
+//! Error handling types and utilities for the Crabfin API client
 //!
 //! This module defines comprehensive error types for all possible failure modes
-//! when communicating with Jellyfin servers, including network errors, authentication
+//! when communicating with servers, including network errors, authentication
 //! failures, server errors, and parsing errors.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
-/// Comprehensive error type for Jellyfin API operations
+/// Comprehensive error type for Crabfin API operations
 ///
 /// This enum covers all possible error conditions that can occur when
-/// communicating with a Jellyfin server, providing detailed error information
+/// communicating with a server, providing detailed error information
 /// and appropriate error handling strategies.
 #[derive(Debug, Error)]
-pub enum JellyfinError {
+pub enum CrabfinError {
     /// Network-related errors (connection failures, timeouts, etc.)
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
@@ -56,7 +56,7 @@ pub enum JellyfinError {
     Api { message: String, code: Option<String> },
 }
 
-impl JellyfinError {
+impl CrabfinError {
     /// Create a new authentication error
     pub fn authentication<S: Into<String>>(message: S) -> Self {
         Self::Authentication {
@@ -170,9 +170,9 @@ impl JellyfinError {
     }
 }
 
-/// Jellyfin API error response structure
+/// API error response structure
 ///
-/// This represents the standard error response format from Jellyfin servers.
+/// This represents the standard error response format from servers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorResponse {
     /// Error message from the server
@@ -198,8 +198,8 @@ impl fmt::Display for ApiErrorResponse {
     }
 }
 
-/// Result type alias for Jellyfin operations
-pub type JellyfinResult<T> = Result<T, JellyfinError>;
+/// Result type alias for Crabfin operations
+pub type CrabfinResult<T> = Result<T, CrabfinError>;
 
 /// Utility functions for error handling
 pub mod utils {
@@ -207,11 +207,11 @@ pub mod utils {
     use reqwest::Response;
     use tracing::{error, warn};
 
-    /// Convert an HTTP response to a JellyfinError
+    /// Convert an HTTP response to a CrabfinError
     ///
     /// This function examines the response status and attempts to parse
-    /// the response body as a Jellyfin error response.
-    pub async fn response_to_error(response: Response) -> JellyfinError {
+    /// the response body as a error response.
+    pub async fn response_to_error(response: Response) -> CrabfinError {
         let status = response.status();
         let status_code = status.as_u16();
 
@@ -220,25 +220,25 @@ pub mod utils {
             Ok(text) => text,
             Err(e) => {
                 error!("Failed to read error response body: {}", e);
-                return JellyfinError::server(status_code, "Failed to read error response".to_string());
+                return CrabfinError::server(status_code, "Failed to read error response".to_string());
             }
         };
 
-        // Try to parse as Jellyfin API error response
+        // Try to parse as API error response
         if let Ok(api_error) = serde_json::from_str::<ApiErrorResponse>(&response_text) {
             let message = api_error.message.unwrap_or_else(|| "Unknown API error".to_string());
 
             return match status_code {
-                401 => JellyfinError::authentication(message),
+                401 => CrabfinError::authentication(message),
                 429 => {
                     // Try to extract retry-after from the error details
                     let retry_after = api_error.details
                         .get("RetryAfter")
                         .and_then(|v| v.as_u64());
-                    JellyfinError::rate_limit(message, retry_after)
+                    CrabfinError::rate_limit(message, retry_after)
                 }
-                500..=599 => JellyfinError::server_unavailable(message),
-                _ => JellyfinError::server(status_code, message),
+                500..=599 => CrabfinError::server_unavailable(message),
+                _ => CrabfinError::server(status_code, message),
             };
         }
 
@@ -250,32 +250,32 @@ pub mod utils {
         };
 
         match status_code {
-            401 => JellyfinError::authentication(message),
-            429 => JellyfinError::rate_limit(message, None),
-            500..=599 => JellyfinError::server_unavailable(message),
-            _ => JellyfinError::server(status_code, message),
+            401 => CrabfinError::authentication(message),
+            429 => CrabfinError::rate_limit(message, None),
+            500..=599 => CrabfinError::server_unavailable(message),
+            _ => CrabfinError::server(status_code, message),
         }
     }
 
     /// Log an error with appropriate level based on error type
-    pub fn log_error(error: &JellyfinError, context: &str) {
+    pub fn log_error(error: &CrabfinError, context: &str) {
         match error {
-            JellyfinError::Network(e) if e.is_timeout() => {
+            CrabfinError::Network(e) if e.is_timeout() => {
                 warn!("{}: Network timeout - {}", context, error);
             }
-            JellyfinError::Network(_) => {
+            CrabfinError::Network(_) => {
                 error!("{}: Network error - {}", context, error);
             }
-            JellyfinError::Authentication { .. } => {
+            CrabfinError::Authentication { .. } => {
                 warn!("{}: Authentication error - {}", context, error);
             }
-            JellyfinError::Server { status, .. } if *status >= 500 => {
+            CrabfinError::Server { status, .. } if *status >= 500 => {
                 error!("{}: Server error - {}", context, error);
             }
-            JellyfinError::Server { .. } => {
+            CrabfinError::Server { .. } => {
                 warn!("{}: Client error - {}", context, error);
             }
-            JellyfinError::RateLimit { .. } => {
+            CrabfinError::RateLimit { .. } => {
                 warn!("{}: Rate limited - {}", context, error);
             }
             _ => {
@@ -285,20 +285,20 @@ pub mod utils {
     }
 
     /// Check if an error indicates the server is unreachable
-    pub fn is_server_unreachable(error: &JellyfinError) -> bool {
+    pub fn is_server_unreachable(error: &CrabfinError) -> bool {
         match error {
-            JellyfinError::Network(e) => e.is_connect() || e.is_timeout(),
-            JellyfinError::ServerUnavailable { .. } => true,
-            JellyfinError::Server { status, .. } => *status >= 500,
+            CrabfinError::Network(e) => e.is_connect() || e.is_timeout(),
+            CrabfinError::ServerUnavailable { .. } => true,
+            CrabfinError::Server { status, .. } => *status >= 500,
             _ => false,
         }
     }
 
     /// Extract authentication error details
-    pub fn extract_auth_error_details(error: &JellyfinError) -> Option<String> {
+    pub fn extract_auth_error_details(error: &CrabfinError) -> Option<String> {
         match error {
-            JellyfinError::Authentication { message } => Some(message.clone()),
-            JellyfinError::Server { status: 401, message } => Some(message.clone()),
+            CrabfinError::Authentication { message } => Some(message.clone()),
+            CrabfinError::Server { status: 401, message } => Some(message.clone()),
             _ => None,
         }
     }
@@ -312,49 +312,49 @@ mod tests {
     fn test_error_retryability() {
         // Network errors should be retryable (using a mock network error)
         // Note: In real usage, reqwest::Error would be created by reqwest itself
-        let network_error = JellyfinError::server_unavailable("Connection timeout");
+        let network_error = CrabfinError::server_unavailable("Connection timeout");
         assert!(network_error.is_retryable());
 
         // 5xx server errors should be retryable
-        let server_error = JellyfinError::server(500, "Internal server error".to_string());
+        let server_error = CrabfinError::server(500, "Internal server error".to_string());
         assert!(server_error.is_retryable());
 
         // 4xx client errors should not be retryable
-        let client_error = JellyfinError::server(400, "Bad request".to_string());
+        let client_error = CrabfinError::server(400, "Bad request".to_string());
         assert!(!client_error.is_retryable());
 
         // Authentication errors should not be retryable
-        let auth_error = JellyfinError::authentication("Invalid credentials");
+        let auth_error = CrabfinError::authentication("Invalid credentials");
         assert!(!auth_error.is_retryable());
 
         // Rate limit errors should be retryable
-        let rate_limit_error = JellyfinError::rate_limit("Too many requests", Some(60));
+        let rate_limit_error = CrabfinError::rate_limit("Too many requests", Some(60));
         assert!(rate_limit_error.is_retryable());
     }
 
     #[test]
     fn test_retry_delay() {
         // Rate limit error with retry-after
-        let rate_limit_error = JellyfinError::rate_limit("Too many requests", Some(60));
+        let rate_limit_error = CrabfinError::rate_limit("Too many requests", Some(60));
         assert_eq!(rate_limit_error.retry_delay(), Some(60));
 
         // Server error should have default delay
-        let server_error = JellyfinError::server(500, "Internal server error".to_string());
+        let server_error = CrabfinError::server(500, "Internal server error".to_string());
         assert_eq!(server_error.retry_delay(), Some(2));
 
         // Non-retryable error should have no delay
-        let auth_error = JellyfinError::authentication("Invalid credentials");
+        let auth_error = CrabfinError::authentication("Invalid credentials");
         assert_eq!(auth_error.retry_delay(), None);
     }
 
     #[test]
     fn test_error_type_checks() {
-        let auth_error = JellyfinError::authentication("Invalid credentials");
+        let auth_error = CrabfinError::authentication("Invalid credentials");
         assert!(auth_error.is_authentication_error());
         assert!(!auth_error.is_network_error());
         assert!(!auth_error.is_server_error());
 
-        let server_error = JellyfinError::server(500, "Internal server error".to_string());
+        let server_error = CrabfinError::server(500, "Internal server error".to_string());
         assert!(!server_error.is_authentication_error());
         assert!(!server_error.is_network_error());
         assert!(server_error.is_server_error());

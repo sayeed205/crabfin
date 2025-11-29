@@ -1,7 +1,7 @@
-//! Jellyfin API client implementation
+//! Crabfin API client implementation
 //!
-//! This module contains the main JellyfinClient struct that handles HTTP communication
-//! with Jellyfin servers, including authentication, request/response handling, and
+//! This module contains the main CrabfinClient struct that handles HTTP communication
+//! with servers, including authentication, request/response handling, and
 //! connection management.
 
 use anyhow::Result;
@@ -12,7 +12,14 @@ use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
-use super::error::{utils as error_utils, JellyfinError};
+use super::error::{utils as error_utils, CrabfinError, CrabfinResult};
+use crate::models::{
+    api::{
+        AuthResponse, BaseItem, ItemsQuery, ItemsResponse, SearchHintResult, ServerInfo, UserInfo,
+    },
+    media::PlaybackInfo,
+    server::ServerConfig,
+};
 
 /// Configuration for automatic reconnection
 #[derive(Debug, Clone)]
@@ -41,7 +48,7 @@ impl Default for ReconnectConfig {
     }
 }
 
-/// Connection state for a Jellyfin server
+/// Connection state for a server
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConnectionState {
     /// Not connected to any server
@@ -56,7 +63,7 @@ pub enum ConnectionState {
     Reconnecting,
 }
 
-/// Connection information for a Jellyfin server
+/// Connection information for a server
 #[derive(Debug, Clone)]
 pub struct ConnectionInfo {
     /// Current connection state
@@ -118,12 +125,12 @@ pub trait ConnectionEventListener: Send + Sync {
     fn on_connection_event(&self, event: ConnectionEvent);
 }
 
-/// Main Jellyfin API client
+/// Main client for interacting with the Crabfin API
 ///
-/// This client handles all HTTP communication with Jellyfin servers,
-/// including authentication, request building, response parsing, and
-/// connection management with automatic reconnection.
-pub struct JellyfinClient {
+/// This struct maintains the HTTP client, authentication state, and
+/// configuration for communicating with a server.
+#[derive(Clone)]
+pub struct CrabfinClient {
     /// The underlying HTTP client
     http_client: Client,
     /// Current server URL (None if not connected)
@@ -144,11 +151,8 @@ pub struct JellyfinClient {
     reconnect_config: ReconnectConfig,
 }
 
-impl JellyfinClient {
-    /// Create a new JellyfinClient instance
-    ///
-    /// This creates a client with default configuration but no server connection.
-    /// Use `connect()` to establish a connection to a Jellyfin server.
+impl CrabfinClient {
+    /// Create a new CrabfinClient instance
     pub fn new() -> Self {
         let device_id = Self::generate_device_id();
         let client_name = "Crabfin".to_string();
@@ -160,7 +164,7 @@ impl JellyfinClient {
             .build()
             .expect("Failed to create HTTP client");
 
-        debug!("Created new JellyfinClient with device ID: {}", device_id);
+        debug!("Created new CrabfinClient with device ID: {}", device_id);
 
         Self {
             http_client,
@@ -175,7 +179,7 @@ impl JellyfinClient {
         }
     }
 
-    /// Create a new JellyfinClient with custom configuration
+    /// Create a new CrabfinClient with custom configuration
     pub fn with_config(
         client_name: String,
         client_version: String,
@@ -187,9 +191,9 @@ impl JellyfinClient {
             .timeout(timeout)
             .user_agent(format!("{}/{}", client_name, client_version))
             .build()
-            .map_err(JellyfinError::Network)?;
+            .map_err(CrabfinError::Network)?;
 
-        debug!("Created new JellyfinClient with custom config - device ID: {}", device_id);
+        debug!("Created new CrabfinClient with custom config - device ID: {}", device_id);
 
         Ok(Self {
             http_client,
@@ -204,7 +208,7 @@ impl JellyfinClient {
         })
     }
 
-    /// Create a new JellyfinClient with custom reconnection configuration
+    /// Create a new CrabfinClient with custom reconnection configuration
     pub fn with_reconnect_config(reconnect_config: ReconnectConfig) -> Self {
         let mut client = Self::new();
         client.reconnect_config = reconnect_config;
@@ -214,7 +218,7 @@ impl JellyfinClient {
     /// Generate a unique device ID
     ///
     /// This creates a CUID2 that uniquely identifies this client instance
-    /// to the Jellyfin server.
+    /// to the server.
     fn generate_device_id() -> String {
         cuid2::create_id()
     }
@@ -349,7 +353,7 @@ impl JellyfinClient {
         let url = url.trim();
 
         if url.is_empty() {
-            return Err(JellyfinError::InvalidUrl("URL cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("URL cannot be empty".to_string()).into());
         }
 
         let normalized = if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -363,7 +367,7 @@ impl JellyfinClient {
 
         // Basic URL validation
         if let Err(e) = reqwest::Url::parse(&normalized) {
-            return Err(JellyfinError::InvalidUrl(format!("Invalid URL format: {}", e)).into());
+            return Err(CrabfinError::InvalidUrl(format!("Invalid URL format: {}", e)).into());
         }
 
         Ok(normalized)
@@ -375,7 +379,7 @@ impl JellyfinClient {
     fn build_api_url(&self, path: &str) -> Result<String> {
         let server_url = self.server_url
             .as_ref()
-            .ok_or_else(|| JellyfinError::InvalidUrl("No server URL set".to_string()))?;
+            .ok_or_else(|| CrabfinError::InvalidUrl("No server URL set".to_string()))?;
 
         let path = path.trim_start_matches('/');
         Ok(format!("{}/{}", server_url, path))
@@ -420,7 +424,7 @@ impl JellyfinClient {
 
     /// Make a raw HTTP request with connection management
     ///
-    /// This is the low-level method for making HTTP requests to the Jellyfin API.
+    /// This is the low-level method for making HTTP requests to the API.
     /// It handles URL building, header injection, error handling, and automatic
     /// reconnection on network failures.
     pub async fn request_raw(
@@ -454,13 +458,13 @@ impl JellyfinClient {
             .await
             .map_err(|e| {
                 // Check if this is a network error that might indicate connection loss
-                let jellyfin_error = JellyfinError::Network(e);
-                if error_utils::is_server_unreachable(&jellyfin_error) {
+                let crabfin_error = CrabfinError::Network(e);
+                if error_utils::is_server_unreachable(&crabfin_error) {
                     // Note: We can't call async methods here due to the closure context
                     // The connection check will be handled by the caller or periodic checks
-                    warn!("Network error detected, connection may be lost: {}", jellyfin_error);
+                    warn!("Network error detected, connection may be lost: {}", crabfin_error);
                 }
-                jellyfin_error
+                crabfin_error
             })?;
 
         let status = response.status();
@@ -490,7 +494,7 @@ impl JellyfinClient {
         R: for<'de> Deserialize<'de>,
     {
         let body_bytes = if let Some(body_data) = body {
-            Some(serde_json::to_vec(body_data).map_err(JellyfinError::Parsing)?)
+            Some(serde_json::to_vec(body_data).map_err(CrabfinError::Parsing)?)
         } else {
             None
         };
@@ -502,20 +506,20 @@ impl JellyfinClient {
             Some("application/json"),
         ).await?;
 
-        let response_text = response.text().await.map_err(JellyfinError::Network)?;
+        let response_text = response.text().await.map_err(CrabfinError::Network)?;
 
         if response_text.is_empty() {
             // Handle empty responses for requests that don't return data
             if std::any::type_name::<R>() == "()" {
                 // This is a bit of a hack, but it works for unit type returns
-                return Ok(serde_json::from_str("null").map_err(JellyfinError::Parsing)?);
+                return Ok(serde_json::from_str("null").map_err(CrabfinError::Parsing)?);
             }
         }
 
         serde_json::from_str(&response_text).map_err(|e| {
             error!("Failed to parse JSON response: {}", e);
             error!("Response text: {}", response_text);
-            JellyfinError::Parsing(e).into()
+            CrabfinError::Parsing(e).into()
         })
     }
 
@@ -557,7 +561,7 @@ impl JellyfinClient {
 
     /// Get server information
     ///
-    /// Retrieves detailed information about the Jellyfin server.
+    /// Retrieves detailed information about the server.
     /// Requires authentication.
     pub async fn get_server_info(&self) -> Result<crate::models::api::ServerInfo> {
         info!("Getting server information");
@@ -581,17 +585,17 @@ impl JellyfinClient {
             .headers(headers)
             .send()
             .await
-            .map_err(JellyfinError::Network)?;
+            .map_err(CrabfinError::Network)?;
 
         let status = response.status();
         debug!("Public server info response status: {}", status);
 
         if status.is_success() {
-            let response_text = response.text().await.map_err(JellyfinError::Network)?;
+            let response_text = response.text().await.map_err(CrabfinError::Network)?;
             serde_json::from_str(&response_text).map_err(|e| {
                 error!("Failed to parse public server info JSON: {}", e);
                 error!("Response text: {}", response_text);
-                JellyfinError::Parsing(e).into()
+                CrabfinError::Parsing(e).into()
             })
         } else {
             let error = error_utils::response_to_error(response).await;
@@ -602,19 +606,19 @@ impl JellyfinClient {
 
     /// Ping the server
     ///
-    /// Tests connectivity to the Jellyfin server. Returns success if the server
+    /// Tests connectivity to the server. Returns success if the server
     /// is reachable and responding.
     pub async fn ping(&self) -> Result<()> {
         info!("Pinging server");
 
         let response = self.request_raw(Method::GET, "/System/Ping", None, None).await?;
-        let response_text = response.text().await.map_err(JellyfinError::Network)?;
+        let response_text = response.text().await.map_err(CrabfinError::Network)?;
 
         debug!("Ping response: {}", response_text);
         Ok(())
     }
 
-    /// Connect to a Jellyfin server with validation and state tracking
+    /// Connect to a server with validation and state tracking
     ///
     /// Validates the server URL, retrieves public server information, and
     /// updates connection state with notifications. This method should be
@@ -769,7 +773,7 @@ impl JellyfinClient {
             Some(url) => url.clone(),
             None => {
                 warn!("Cannot reconnect: no server URL available");
-                return Err(JellyfinError::configuration("No server URL for reconnection").into());
+                return Err(CrabfinError::configuration("No server URL for reconnection").into());
             }
         };
 
@@ -823,43 +827,42 @@ impl JellyfinClient {
         let error_msg = "Maximum reconnection attempts exceeded".to_string();
         self.update_connection_error(error_msg.clone()).await;
         self.update_connection_state(ConnectionState::Failed(error_msg)).await;
-        Err(JellyfinError::configuration("Reconnection failed").into())
+        Err(CrabfinError::configuration("Reconnection failed").into())
     }
 
     // Authentication API methods
 
-    /// Authenticate with username and password
-    ///
-    /// Authenticates a user with the Jellyfin server using username and password.
-    /// On successful authentication, the access token is automatically stored
-    /// and will be included in subsequent API requests.
-    pub async fn authenticate(&mut self, username: &str, password: &str) -> Result<crate::models::api::AuthResponse> {
+    /// Authenticate with the server
+    pub async fn authenticate(
+        &mut self,
+        username: &str,
+        password: &str,
+    ) -> CrabfinResult<UserInfo> {
         info!("Authenticating user: {}", username);
 
         if self.server_url.is_none() {
-            return Err(JellyfinError::InvalidUrl("No server URL set. Call connect() first.".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("No server URL set. Call connect() first.".to_string()).into());
         }
 
         let auth_request = crate::models::api::AuthRequest::new(
             username.to_string(),
             password.to_string(),
         );
-
         match self.post::<_, crate::models::api::AuthResponse>("/Users/AuthenticateByName", &auth_request).await {
             Ok(auth_response) => {
                 info!("Authentication successful for user: {}", auth_response.user.name);
 
-                // Store the access token for future requests
-                self.set_auth_token(auth_response.access_token.clone());
+                self.auth_token = Some(auth_response.access_token.clone());
 
-                debug!("Access token stored, user ID: {}", auth_response.user.id);
-                Ok(auth_response)
+                // Save session info if needed
+
+                Ok(auth_response.user)
             }
             Err(e) => {
-                error!("Authentication failed for user {}: {}", username, e);
+                error!("Authentication failed: {}", e);
                 // Clear any existing token on failed authentication
                 self.clear_auth_token();
-                Err(e)
+                Err(CrabfinError::Api { message: e.to_string(), code: None })
             }
         }
     }
@@ -886,31 +889,50 @@ impl JellyfinClient {
     ///
     /// Retrieves information about the currently authenticated user.
     /// Requires authentication.
-    pub async fn get_current_user(&self) -> Result<crate::models::api::UserInfo> {
+    pub async fn get_current_user(&self) -> CrabfinResult<UserInfo> {
         info!("Getting current user information");
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available"));
         }
 
         self.get("/Users/Me").await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })
     }
 
     // Library API methods
 
+    /// Get the current user's library views
+    pub async fn get_user_views(&self, user_id: &str) -> CrabfinResult<Vec<BaseItem>> {
+        let endpoint = format!("/Users/{}/Views", user_id);
+        let response: ItemsResponse = self.get(&endpoint).await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })?;
+        Ok(response.items)
+    }
+
     /// Get items from the library
-    ///
-    /// Retrieves items from the Jellyfin library based on query parameters.
-    /// This is the primary method for browsing and filtering library content.
-    /// Requires authentication.
-    pub async fn get_items(&self, params: &crate::models::api::ItemsQuery) -> Result<crate::models::api::ItemsResponse> {
+    pub async fn get_items(
+        &self,
+        user_id: &str,
+        parent_id: Option<&str>,
+        limit: Option<u32>,
+    ) -> CrabfinResult<ItemsResponse> {
         info!("Getting items with query parameters");
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         // Build query string from parameters
+        let mut params = ItemsQuery::new();
+        params.user_id = Some(user_id.to_string());
+        if let Some(pid) = parent_id {
+            params.parent_id = Some(pid.to_string());
+        }
+        if let Some(l) = limit {
+            params.limit = Some(l);
+        }
+
         let query_string = params.to_query_string();
         let path = if query_string.is_empty() {
             "/Items".to_string()
@@ -920,81 +942,68 @@ impl JellyfinClient {
 
         debug!("Items query path: {}", path);
         self.get(&path).await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })
     }
 
     /// Get a specific item by ID
     ///
     /// Retrieves detailed information about a specific library item.
     /// Requires authentication.
-    pub async fn get_item(&self, item_id: &str) -> Result<crate::models::api::BaseItem> {
+    pub async fn get_item(&self, item_id: &str) -> CrabfinResult<BaseItem> {
         info!("Getting item with ID: {}", item_id);
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         if item_id.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
         }
 
         let path = format!("/Items/{}", item_id);
         self.get(&path).await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })
     }
 
-    /// Search for items in the library
-    ///
-    /// Performs a search across the library using the search hints endpoint.
-    /// This provides fast search results with basic item information.
-    /// Requires authentication.
-    pub async fn search(&self, query: &str, limit: Option<u32>) -> Result<crate::models::api::SearchHintResult> {
-        info!("Searching for: {}", query);
+    /// Search for items
+    pub async fn search(&self, user_id: &str, query: &str) -> CrabfinResult<ItemsResponse> {
+        let mut params = ItemsQuery::new();
+        params.user_id = Some(user_id.to_string());
+        params.search_term = Some(query.to_string());
+        params.limit = Some(20);
+        params.recursive = true;
+        params.include_item_types = vec!["Movie".to_string(), "Series".to_string(), "Episode".to_string()];
 
-        if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
-        }
+        let query_string = params.to_query_string();
+        let path = format!("/Items?{}", query_string);
 
-        if query.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Search query cannot be empty".to_string()).into());
-        }
-
-        // URL encode the search term
-        let encoded_query = urlencoding::encode(query);
-        let mut path = format!("/Search/Hints?searchTerm={}", encoded_query);
-
-        if let Some(limit_val) = limit {
-            path.push_str(&format!("&limit={}", limit_val));
-        }
-
-        debug!("Search path: {}", path);
         self.get(&path).await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })
     }
 
     // Media streaming API methods
 
     /// Get playback info for an item
-    ///
-    /// Retrieves playback information including media sources and streaming details
-    /// for a specific item. This is required before starting playback.
-    /// Requires authentication.
-    pub async fn get_playback_info(&self, item_id: &str, user_id: Option<&str>) -> Result<crate::models::api::PlaybackInfoResponse> {
+    pub async fn get_playback_info(&self, item_id: &str, user_id: &str) -> CrabfinResult<PlaybackInfo> {
         info!("Getting playback info for item: {}", item_id);
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         if item_id.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
         }
 
         let mut path = format!("/Items/{}/PlaybackInfo", item_id);
 
-        if let Some(uid) = user_id {
-            path.push_str(&format!("?userId={}", urlencoding::encode(uid)));
+        if !user_id.is_empty() {
+            path.push_str(&format!("?userId={}", urlencoding::encode(user_id)));
         }
 
         debug!("Playback info path: {}", path);
         self.get(&path).await
+            .map_err(|e| CrabfinError::Api { message: e.to_string(), code: None })
     }
 
     /// Get streaming URL for an item
@@ -1007,10 +1016,10 @@ impl JellyfinClient {
 
         let server_url = self.server_url
             .as_ref()
-            .ok_or_else(|| JellyfinError::InvalidUrl("No server URL set".to_string()))?;
+            .ok_or_else(|| CrabfinError::InvalidUrl("No server URL set".to_string()))?;
 
         if item_id.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
         }
 
         let query_string = params.to_query_string();
@@ -1035,14 +1044,14 @@ impl JellyfinClient {
 
         let server_url = self.server_url
             .as_ref()
-            .ok_or_else(|| JellyfinError::InvalidUrl("No server URL set".to_string()))?;
+            .ok_or_else(|| CrabfinError::InvalidUrl("No server URL set".to_string()))?;
 
         if item_id.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("Item ID cannot be empty".to_string()).into());
         }
 
         if container.is_empty() {
-            return Err(JellyfinError::InvalidUrl("Container cannot be empty".to_string()).into());
+            return Err(CrabfinError::InvalidUrl("Container cannot be empty".to_string()).into());
         }
 
         let query_string = params.to_query_string();
@@ -1067,7 +1076,7 @@ impl JellyfinClient {
         info!("Reporting playback start for item: {}", info.item_id);
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         self.post::<_, serde_json::Value>("/Sessions/Playing", info).await?;
@@ -1084,7 +1093,7 @@ impl JellyfinClient {
         info!("Reporting playback progress for item: {} at position: {}", info.item_id, info.position_ticks);
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         self.post::<_, serde_json::Value>("/Sessions/Playing/Progress", info).await?;
@@ -1101,7 +1110,7 @@ impl JellyfinClient {
         info!("Reporting playback stop for item: {} at position: {}", info.item_id, info.position_ticks);
 
         if !self.is_authenticated() {
-            return Err(JellyfinError::authentication("No authentication token available").into());
+            return Err(CrabfinError::authentication("No authentication token available").into());
         }
 
         self.post::<_, serde_json::Value>("/Sessions/Playing/Stopped", info).await?;
@@ -1111,47 +1120,32 @@ impl JellyfinClient {
 
     /// Refresh authentication token
     ///
-    /// Note: Jellyfin doesn't have a traditional token refresh endpoint.
+    /// Note: Crabfin doesn't have a traditional token refresh endpoint.
     /// This method will re-authenticate using stored credentials if available,
     /// or return an error requiring manual re-authentication.
     pub async fn refresh_token(&mut self) -> Result<()> {
-        warn!("Token refresh requested, but Jellyfin doesn't support token refresh");
+        warn!("Token refresh requested, but Crabfin doesn't support token refresh");
         warn!("Manual re-authentication required");
 
         // Clear the current token since it's presumably invalid
         self.clear_auth_token();
 
-        Err(JellyfinError::authentication(
+        Err(CrabfinError::authentication(
             "Token refresh not supported. Please re-authenticate manually."
         ).into())
     }
 }
 
-impl Default for JellyfinClient {
+impl Default for CrabfinClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Clone for JellyfinClient {
-    fn clone(&self) -> Self {
-        Self {
-            http_client: self.http_client.clone(),
-            server_url: self.server_url.clone(),
-            auth_token: self.auth_token.clone(),
-            device_id: self.device_id.clone(),
-            client_name: self.client_name.clone(),
-            client_version: self.client_version.clone(),
-            connection_info: Arc::clone(&self.connection_info),
-            event_listeners: Arc::clone(&self.event_listeners),
-            reconnect_config: self.reconnect_config.clone(),
-        }
-    }
-}
 
-impl std::fmt::Debug for JellyfinClient {
+impl std::fmt::Debug for CrabfinClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("JellyfinClient")
+        f.debug_struct("CrabfinClient")
             .field("server_url", &self.server_url)
             .field("device_id", &self.device_id)
             .field("client_name", &self.client_name)

@@ -1,10 +1,10 @@
 //! Server models
 //!
-//! This module contains data structures for Jellyfin server information.
+//! This module contains data structures for server information.
 
 use serde::{Deserialize, Serialize};
 
-/// Jellyfin server configuration
+/// Server configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     /// Unique server identifier

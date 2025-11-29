@@ -11,7 +11,7 @@ use super::{ServerConfig, UserSession};
 /// Main application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// List of configured Jellyfin servers
+    /// List of configured servers
     pub servers: Vec<ServerConfig>,
     /// Currently active user session
     pub current_user: Option<UserSession>,

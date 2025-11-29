@@ -1,7 +1,7 @@
 //! Authentication and session management module
 //!
 //! This module handles user authentication, token management,
-//! and session persistence across multiple Jellyfin servers.
+//! and session persistence across multiple servers.
 
 pub mod session;
 pub mod token;
