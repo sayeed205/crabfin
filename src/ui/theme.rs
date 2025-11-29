@@ -69,6 +69,10 @@ impl Theme {
     pub fn inverse_surface(&self) -> Hsla { self.color(self.scheme.inverse_surface) }
     pub fn inverse_on_surface(&self) -> Hsla { self.color(self.scheme.inverse_on_surface) }
     pub fn inverse_primary(&self) -> Hsla { self.color(self.scheme.inverse_primary) }
+
+    pub fn font_family(&self) -> SharedString {
+        "Adwaita Sans".into()
+    }
 }
 
 // Green 500: #4CAF50 -> 0xFF4CAF50

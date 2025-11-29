@@ -137,6 +137,7 @@ impl RenderOnce for Button {
 
         let label_div = div()
             .text_color(text_color)
+            .font_family(theme.font_family())
             .font_weight(FontWeight::MEDIUM)
             .line_height(relative(1.0));
 

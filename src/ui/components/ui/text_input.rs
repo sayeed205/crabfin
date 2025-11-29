@@ -522,7 +522,11 @@ impl Element for TextElement {
 
         let run = TextRun {
             len: display_text.len(),
-            font: style.font(),
+            font: {
+                let mut s = style.clone();
+                s.font_family = theme.font_family();
+                s.font()
+            },
             color: text_color,
             background_color: None,
             underline: None,
