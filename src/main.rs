@@ -1,5 +1,6 @@
 mod config;
 mod views;
+mod components;
 mod state;
 mod api;
 
@@ -128,29 +129,59 @@ impl CrabfinApp {
                 {
                     let weak_app = weak_app.clone();
                     let url = url.clone();
-                    move |username, _password, window, cx| {
-                        let _ = weak_app.update(cx, |app, cx| {
-                            // TODO: Implement actual login
-                            // For now just update the server with user_id and token
-                            app.state.update(cx, |state, _cx| {
-                                if let Some(server) = state.config.servers.iter_mut().find(|s| s.url == url) {
-                                    server.user_id = Some(username);
-                                    server.access_token = Some("dummy_token".to_string());
-                                    let _ = state.config.save();
-                                }
-                            });
+                    move |username, password, window, cx| {
+                        let weak_app = weak_app.clone();
+                        let url = url.clone();
+                        let view = cx.weak_entity();
 
-                            let servers = app.state.read(cx).config.servers.clone();
-                            app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
-                            cx.notify();
-                        });
+                        cx.spawn_in(&*window, |_, mut cx: &mut AsyncWindowContext| {
+                            let mut cx = cx.clone();
+                            async move {
+                                let _ = view.update(&mut cx, |view, cx| {
+                                    view.set_loading(true, cx);
+                                    view.set_error(None, cx);
+                                });
+
+                                match api::authenticate(&url, &username, &password).await {
+                                    Ok(auth_response) => {
+                                        if let Some(app_entity) = weak_app.upgrade() {
+                                            cx.update_window_entity(&app_entity, |app, window, cx| {
+                                                app.state.update(cx, |state, _cx| {
+                                                    if let Some(server) = state.config.servers.iter_mut().find(|s| s.url == url) {
+                                                        server.user_id = Some(auth_response.user.id);
+                                                        server.access_token = Some(auth_response.access_token);
+                                                        let _ = state.config.save();
+                                                    }
+                                                });
+
+                                                let servers = app.state.read(cx).config.servers.clone();
+                                                app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                                                cx.notify();
+                                            }).ok();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        let _ = view.update(&mut cx, |view, cx| {
+                                            view.set_loading(false, cx);
+                                            view.set_error(Some(format!("Login failed: {}", e)), cx);
+                                        });
+                                    }
+                                }
+                            }
+                        }).detach();
                     }
                 },
                 {
                     let weak_app = weak_app.clone();
                     move |window, cx| {
                         let _ = weak_app.update(cx, |app, cx| {
-                            app.active_view = Self::create_add_server_view(weak_app.clone(), window, cx);
+                            // If we have servers, go back to list, else add server
+                            let servers = app.state.read(cx).config.servers.clone();
+                            if !servers.is_empty() {
+                                app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                            } else {
+                                app.active_view = Self::create_add_server_view(weak_app.clone(), window, cx);
+                            }
                             cx.notify();
                         });
                     }
