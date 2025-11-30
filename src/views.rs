@@ -78,6 +78,8 @@ pub struct AddServerView {
     input: Entity<InputState>,
     on_connect: Box<dyn Fn(String, &mut Window, &mut Context<AddServerView>) + 'static>,
     on_cancel: Box<dyn Fn(&mut Window, &mut Context<AddServerView>) + 'static>,
+    is_validating: bool,
+    error_message: Option<String>,
 }
 
 impl AddServerView {
@@ -87,12 +89,25 @@ impl AddServerView {
         on_connect: impl Fn(String, &mut Window, &mut Context<AddServerView>) + 'static,
         on_cancel: impl Fn(&mut Window, &mut Context<AddServerView>) + 'static,
     ) -> Self {
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder("https://jellyfin.example.com"));
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder("Server URL"));
+
         Self {
             input,
             on_connect: Box::new(on_connect),
             on_cancel: Box::new(on_cancel),
+            is_validating: false,
+            error_message: None,
         }
+    }
+
+    pub fn set_validating(&mut self, validating: bool, cx: &mut Context<Self>) {
+        self.is_validating = validating;
+        cx.notify();
+    }
+
+    pub fn set_error(&mut self, error: Option<String>, cx: &mut Context<Self>) {
+        self.error_message = error;
+        cx.notify();
     }
 }
 
@@ -115,6 +130,9 @@ impl Render for AddServerView {
                     .gap_4()
                     .child(div().text_xl().font_bold().child("Add Server"))
                     .child(Input::new(&self.input))
+                    .children(self.error_message.as_ref().map(|msg| {
+                        div().text_sm().text_color(theme.danger).child(msg.clone())
+                    }))
                     .child(
                         h_flex()
                             .gap_2()
@@ -129,7 +147,8 @@ impl Render for AddServerView {
                             .child(
                                 Button::new("connect")
                                     .primary()
-                                    .label("Connect")
+                                    .label(if self.is_validating { "Connecting..." } else { "Connect" })
+                                    .disabled(self.is_validating)
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         let url = this.input.read(cx).value();
                                         if !url.is_empty() {
