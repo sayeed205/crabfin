@@ -9,10 +9,14 @@ use serde::{Deserialize, Serialize};
 pub struct UserSession {
     /// Server ID this session belongs to
     pub server_id: String,
+    /// Server name for display
+    pub server_name: String,
     /// User ID
     pub user_id: String,
     /// Username
     pub username: String,
+    /// Whether user is administrator
+    pub is_admin: bool,
     /// Access token for API requests
     pub access_token: String,
     /// Refresh token (if available)
@@ -25,14 +29,18 @@ impl UserSession {
     /// Create a new user session
     pub fn new(
         server_id: String,
+        server_name: String,
         user_id: String,
         username: String,
+        is_admin: bool,
         access_token: String,
     ) -> Self {
         Self {
             server_id,
+            server_name,
             user_id,
             username,
+            is_admin,
             access_token,
             refresh_token: None,
             expires_at: None,

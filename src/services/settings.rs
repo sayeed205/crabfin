@@ -154,4 +154,45 @@ impl SettingsService {
             None
         }
     }
+
+    /// Save a user session for a server
+    pub async fn save_session(&self, server_id: String, session: crate::models::UserSession) -> Result<()> {
+        tracing::info!("Saving session for server: {}", server_id);
+
+        {
+            let mut config = self.config.write().map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
+            config.sessions.insert(server_id, session);
+        }
+
+        self.save_settings().await
+    }
+
+    /// Get session for a specific server
+    pub fn get_session(&self, server_id: &str) -> Option<crate::models::UserSession> {
+        let config = self.config.read().unwrap();
+        config.sessions.get(server_id).cloned()
+    }
+
+    /// Get session for the currently active server
+    pub fn get_active_session(&self) -> Option<crate::models::UserSession> {
+        let config = self.config.read().unwrap();
+
+        if let Some(active_id) = &config.active_server_id {
+            config.sessions.get(active_id).cloned()
+        } else {
+            None
+        }
+    }
+
+    /// Clear session for a specific server (logout)
+    pub async fn clear_session(&self, server_id: &str) -> Result<()> {
+        tracing::info!("Clearing session for server: {}", server_id);
+
+        {
+            let mut config = self.config.write().map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?;
+            config.sessions.remove(server_id);
+        }
+
+        self.save_settings().await
+    }
 }

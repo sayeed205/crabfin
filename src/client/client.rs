@@ -839,7 +839,7 @@ impl CrabfinClient {
         &mut self,
         username: &str,
         password: &str,
-    ) -> CrabfinResult<UserInfo> {
+    ) -> CrabfinResult<crate::models::api::AuthResponse> {
         info!("Authenticating user: {}", username);
 
         if self.server_url.is_none() {
@@ -856,9 +856,8 @@ impl CrabfinClient {
 
                 self.auth_token = Some(auth_response.access_token.clone());
 
-                // Save session info if needed
-
-                Ok(auth_response.user)
+                // Return full auth response
+                Ok(auth_response)
             }
             Err(e) => {
                 error!("Authentication failed: {}", e);

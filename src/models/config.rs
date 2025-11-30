@@ -4,6 +4,7 @@
 
 use gpui::Global;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{ServerConfig, UserSession};
@@ -15,8 +16,9 @@ pub struct AppConfig {
     pub servers: Vec<ServerConfig>,
     /// ID of the currently active server
     pub active_server_id: Option<String>,
-    /// Currently active user session
-    pub current_user: Option<UserSession>,
+    /// User sessions keyed by server ID
+    #[serde(default)]
+    pub sessions: HashMap<String, UserSession>,
     /// UI-related settings
     pub ui_settings: UiSettings,
     /// Application preferences
@@ -28,7 +30,7 @@ impl Default for AppConfig {
         Self {
             servers: Vec::new(),
             active_server_id: None,
-            current_user: None,
+            sessions: HashMap::new(),
             ui_settings: UiSettings::default(),
             preferences: AppPreferences::default(),
         }

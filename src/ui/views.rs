@@ -1,8 +1,9 @@
-use gpui::prelude::*;
+/**/use gpui::prelude::*;
 use gpui::*;
 
 use super::features::add_server::AddServerView;
 use super::features::auth::AuthView;
+use super::features::logged_in::LoggedInView;
 use super::features::server_selection::ServerSelectionView;
 use super::theme::Theme;
 use crate::services::ServiceManager;
@@ -11,6 +12,7 @@ enum ViewState {
     ServerSelection,
     AddServer,
     Auth,
+    LoggedIn,
     MainApp,
 }
 
@@ -21,6 +23,7 @@ pub struct MainView {
     server_selection_view: Entity<ServerSelectionView>,
     add_server_view: Entity<AddServerView>,
     auth_view: Option<Entity<AuthView>>,
+    logged_in_view: Option<Entity<LoggedInView>>,
 }
 
 impl MainView {
@@ -34,8 +37,14 @@ impl MainView {
             // No servers configured, go to add server
             ViewState::AddServer
         } else if let Some(_active_server_id) = &config.active_server_id {
-            // Has active server, go to auth
-            ViewState::Auth
+            // Has active server, check for session
+            if settings_service.get_active_session().is_some() {
+                // Has session, go to logged-in view
+                ViewState::LoggedIn
+            } else {
+                // No session, go to auth
+                ViewState::Auth
+            }
         } else {
             // Has servers but none selected, go to server selection
             ViewState::ServerSelection
@@ -163,11 +172,17 @@ impl MainView {
             server_selection_view,
             add_server_view,
             auth_view: None,
+            logged_in_view: None,
         };
 
         // Create auth view if needed
         if matches!(view.state, ViewState::Auth) {
             view.create_auth_view(cx);
+        }
+
+        // Create logged-in view if needed
+        if matches!(view.state, ViewState::LoggedIn) {
+            view.create_logged_in_view(cx);
         }
 
         view
@@ -217,11 +232,50 @@ impl MainView {
 
                                 // Then authenticate
                                 match client.authenticate(&username, &password).await {
-                                    Ok(_) => {
-                                        let _ = weak_view.update(cx, |view, cx| {
-                                            view.state = ViewState::MainApp;
-                                            cx.notify();
+                                    Ok(auth_response) => {
+                                        // Create session object
+                                        let session_result = cx.update(|cx| {
+                                            let service_manager = cx.global::<ServiceManager>();
+                                            if let Some(settings_service) = service_manager.settings_service() {
+                                                if let Some(active_server) = settings_service.get_active_server() {
+                                                    let session = crate::models::UserSession::new(
+                                                        active_server.id.clone(),
+                                                        active_server.name.clone(),
+                                                        auth_response.user.id.clone(),
+                                                        auth_response.user.name.clone(),
+                                                        auth_response.user.policy.as_ref()
+                                                            .map(|p| p.is_administrator)
+                                                            .unwrap_or(false),
+                                                        auth_response.access_token.clone(),
+                                                    );
+
+                                                    // Save session asynchronously
+                                                    cx.background_executor().spawn({
+                                                        let settings_service = settings_service.clone();
+                                                        let server_id = active_server.id.clone();
+                                                        let session_clone = session.clone();
+                                                        async move {
+                                                            settings_service.save_session(server_id, session_clone).await
+                                                        }
+                                                    }).detach();
+
+                                                    // Return session and server URL
+                                                    Some((session, active_server.url))
+                                                } else {
+                                                    None
+                                                }
+                                            } else {
+                                                None
+                                            }
                                         });
+
+                                        if let Ok(Some((session, server_url))) = session_result {
+                                            let _ = weak_view.update(cx, |view, cx| {
+                                                view.create_logged_in_view_with_session(session, server_url, cx);
+                                                view.state = ViewState::LoggedIn;
+                                                cx.notify();
+                                            });
+                                        }
                                     }
                                     Err(e) => {
                                         let _ = auth_entity.update(cx, |auth_view, cx| {
@@ -236,6 +290,89 @@ impl MainView {
 
             self.auth_view = Some(auth_view);
         }
+    }
+
+    fn create_logged_in_view(&mut self, cx: &mut Context<Self>) {
+        let service_manager = cx.global::<ServiceManager>();
+        let settings_service = service_manager.settings_service().expect("Settings service not initialized");
+
+        if let Some(session) = settings_service.get_active_session() {
+            if let Some(server) = settings_service.get_active_server() {
+                let weak_view = cx.entity().downgrade();
+
+                let logged_in_view = cx.new(|cx| {
+                    LoggedInView::new(session, server.url, cx)
+                        .on_logout(move |_window, cx| {
+                            let weak_view = weak_view.clone();
+
+                            cx.spawn(async move |_, mut cx| {
+                                let result = cx.update(|cx| {
+                                    let service_manager = cx.global::<ServiceManager>();
+                                    if let Some(settings_service) = service_manager.settings_service() {
+                                        if let Some(active_server) = settings_service.get_active_server() {
+                                            cx.background_executor().spawn({
+                                                let settings_service = settings_service.clone();
+                                                let server_id = active_server.id.clone();
+                                                async move {
+                                                    settings_service.clear_session(&server_id).await
+                                                }
+                                            }).detach();
+                                        }
+                                    }
+                                });
+
+                                if result.is_ok() {
+                                    let _ = weak_view.update(cx, |view, cx| {
+                                        view.create_auth_view(cx);
+                                        view.state = ViewState::Auth;
+                                        cx.notify();
+                                    });
+                                }
+                            }).detach();
+                        })
+                });
+
+                self.logged_in_view = Some(logged_in_view);
+            }
+        }
+    }
+
+    fn create_logged_in_view_with_session(&mut self, session: crate::models::UserSession, server_url: String, cx: &mut Context<Self>) {
+        let weak_view = cx.entity().downgrade();
+
+        let logged_in_view = cx.new(|cx| {
+            LoggedInView::new(session, server_url, cx)
+                .on_logout(move |_window, cx| {
+                    let weak_view = weak_view.clone();
+
+                    cx.spawn(async move |_, mut cx| {
+                        let result = cx.update(|cx| {
+                            let service_manager = cx.global::<ServiceManager>();
+                            if let Some(settings_service) = service_manager.settings_service() {
+                                if let Some(active_server) = settings_service.get_active_server() {
+                                    cx.background_executor().spawn({
+                                        let settings_service = settings_service.clone();
+                                        let server_id = active_server.id.clone();
+                                        async move {
+                                            settings_service.clear_session(&server_id).await
+                                        }
+                                    }).detach();
+                                }
+                            }
+                        });
+
+                        if result.is_ok() {
+                            let _ = weak_view.update(cx, |view, cx| {
+                                view.create_auth_view(cx);
+                                view.state = ViewState::Auth;
+                                cx.notify();
+                            });
+                        }
+                    }).detach();
+                })
+        });
+
+        self.logged_in_view = Some(logged_in_view);
     }
 }
 
@@ -257,6 +394,13 @@ impl Render for MainView {
                     ViewState::Auth => {
                         if let Some(auth_view) = &self.auth_view {
                             auth_view.clone().into_any_element()
+                        } else {
+                            div().child("Loading...").into_any_element()
+                        }
+                    }
+                    ViewState::LoggedIn => {
+                        if let Some(logged_in_view) = &self.logged_in_view {
+                            logged_in_view.clone().into_any_element()
                         } else {
                             div().child("Loading...").into_any_element()
                         }
