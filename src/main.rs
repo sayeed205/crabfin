@@ -144,7 +144,16 @@ fn main() {
 
         cx.spawn(async move |cx| {
             cx.open_window(WindowOptions::default(), |window, cx| {
-                let app = cx.new(|cx| CrabfinApp::new(window, cx));
+                let app = cx.new(|cx| {
+                    cx.observe_window_appearance(window, |_, window, cx| {
+                        Theme::sync_system_appearance(Some(window), cx);
+                    })
+                        .detach();
+
+                    Theme::sync_system_appearance(Some(window), cx);
+
+                    CrabfinApp::new(window, cx)
+                });
                 cx.new(|cx| Root::new(app, window, cx))
             })?;
 
