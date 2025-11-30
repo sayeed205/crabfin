@@ -193,6 +193,29 @@ impl CrabfinApp {
                         });
                     }
                 },
+                {
+                    let weak_app = weak_app.clone();
+                    move |server, window, cx| {
+                        let server_url = server.url.clone();
+                        let _ = weak_app.update(cx, |app, cx| {
+                            app.state.update(cx, |state, _cx| {
+                                if let Some(index) = state.config.servers.iter().position(|s| s.url == server_url) {
+                                    state.config.servers.remove(index);
+                                    let _ = state.config.save();
+                                }
+                            });
+
+                            // Refresh the view
+                            let servers = app.state.read(cx).config.servers.clone();
+                            if servers.is_empty() {
+                                app.active_view = Self::create_add_server_view(weak_app.clone(), window, cx);
+                            } else {
+                                app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                            }
+                            cx.notify();
+                        });
+                    }
+                },
             )
         })
             .into()
@@ -213,7 +236,7 @@ fn main() {
         .unwrap();
     let _guard = runtime.enter();
 
-    let app = Application::new();
+    let app = Application::new().with_assets(gpui_component_assets::Assets);
 
     app.run(move |cx| {
         gpui_component::init(cx);

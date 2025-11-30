@@ -10,7 +10,8 @@ authors = ["Sayed Ahmed <sayeed205@gmail.com>"]
 [dependencies]
 # UI Framework
 gpui = "0.2"
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component = "0.5.0-preview1"
+gpui-component-assets = "0.5.0-preview1"
 
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
