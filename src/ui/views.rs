@@ -1,10 +1,10 @@
 /**/use gpui::prelude::*;
 use gpui::*;
 
-use super::features::add_server::AddServerView;
-use super::features::auth::AuthView;
-use super::features::logged_in::LoggedInView;
-use super::features::server_selection::ServerSelectionView;
+use super::screens::add_server::AddServerView;
+use super::screens::auth::AuthView;
+use super::screens::logged_in::LoggedInView;
+use super::screens::server_selection::ServerSelectionView;
 use super::theme::Theme;
 use crate::services::ServiceManager;
 

@@ -4,7 +4,7 @@
 //! functionality for the client interface.
 
 pub mod components;
-pub mod features;
+pub mod screens;
 pub mod theme;
 pub mod views;
 
