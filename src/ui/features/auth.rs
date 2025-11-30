@@ -2,6 +2,7 @@ use gpui::prelude::*;
 use gpui::*;
 
 use crate::ui::components::ui::button::{Button, ButtonVariant};
+use crate::ui::components::ui::checkbox::Checkbox;
 use crate::ui::components::ui::text_input::TextInput;
 use crate::ui::theme::Theme;
 
@@ -10,9 +11,10 @@ pub struct AuthView {
     server_name: SharedString,
     username_input: Entity<TextInput>,
     password_input: Entity<TextInput>,
+    remember_me: bool,
     error_message: Option<String>,
     is_authenticating: bool,
-    on_login: Option<Box<dyn Fn(String, String, &mut Window, &mut Context<Self>) + 'static>>,
+    on_login: Option<Box<dyn Fn(String, String, bool, &mut Window, &mut Context<Self>) + 'static>>,
     on_back: Option<Box<dyn Fn(&mut Window, &mut Context<Self>) + 'static>>,
 }
 
@@ -33,6 +35,7 @@ impl AuthView {
             server_name: server_name.into(),
             username_input,
             password_input,
+            remember_me: true,  // Default to checked
             error_message: None,
             is_authenticating: false,
             on_login: None,
@@ -51,7 +54,7 @@ impl AuthView {
         cx.notify();
     }
 
-    pub fn on_login(mut self, handler: impl Fn(String, String, &mut Window, &mut Context<Self>) + 'static) -> Self {
+    pub fn on_login(mut self, handler: impl Fn(String, String, bool, &mut Window, &mut Context<Self>) + 'static) -> Self {
         self.on_login = Some(Box::new(handler));
         self
     }
@@ -93,6 +96,14 @@ impl Render for AuthView {
                     .gap_3()
                     .child(self.username_input.clone())
                     .child(self.password_input.clone())
+                    .child(
+                        Checkbox::new("remember-me", "Remember me")
+                            .checked(self.remember_me)
+                            .on_change(cx.listener(|this, checked, _window, cx| {
+                                this.remember_me = *checked;
+                                cx.notify();
+                            }))
+                    )
             )
             .children(
                 self.error_message.as_ref().map(|msg| {
@@ -136,7 +147,7 @@ impl Render for AuthView {
                                     this.is_authenticating = true;
                                     this.error_message = None;
                                     cx.notify();
-                                    callback(username, password, window, cx);
+                                    callback(username, password, this.remember_me, window, cx);
                                 }
                             }))
                     )

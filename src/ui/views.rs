@@ -207,7 +207,7 @@ impl MainView {
                             cx.notify();
                         }).ok();
                     })
-                    .on_login(move |username, password, _window, cx| {
+                    .on_login(move |username, password, remember_me, _window, cx| {
                         let weak_view = weak_view_login.clone();
                         let auth_entity = cx.entity().clone();
 
@@ -249,15 +249,17 @@ impl MainView {
                                                         auth_response.access_token.clone(),
                                                     );
 
-                                                    // Save session asynchronously
-                                                    cx.background_executor().spawn({
-                                                        let settings_service = settings_service.clone();
-                                                        let server_id = active_server.id.clone();
-                                                        let session_clone = session.clone();
-                                                        async move {
-                                                            settings_service.save_session(server_id, session_clone).await
-                                                        }
-                                                    }).detach();
+                                                    // Only save session if remember_me is checked
+                                                    if remember_me {
+                                                        cx.background_executor().spawn({
+                                                            let settings_service = settings_service.clone();
+                                                            let server_id = active_server.id.clone();
+                                                            let session_clone = session.clone();
+                                                            async move {
+                                                                settings_service.save_session(server_id, session_clone).await
+                                                            }
+                                                        }).detach();
+                                                    }
 
                                                     // Return session and server URL
                                                     Some((session, active_server.url))
