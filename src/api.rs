@@ -80,3 +80,34 @@ fn get_auth_header(access_token: Option<&str>) -> String {
 
     auth
 }
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub struct PublicUser {
+    pub name: String,
+    pub id: String,
+    pub primary_image_tag: Option<String>,
+}
+
+pub async fn get_public_users(url: &str) -> Result<Vec<PublicUser>> {
+    let url = if url.ends_with('/') {
+        format!("{}Users/Public", url)
+    } else {
+        format!("{}/Users/Public", url)
+    };
+
+    let client = reqwest::Client::new();
+    let resp = client.get(&url)
+        .header("Authorization", get_auth_header(None))
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let error_text = resp.text().await?;
+        anyhow::bail!("Failed to fetch public users: {} - {}", status, error_text);
+    }
+
+    let users = resp.json::<Vec<PublicUser>>().await?;
+    Ok(users)
+}

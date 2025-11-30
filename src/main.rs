@@ -3,12 +3,13 @@ mod views;
 mod components;
 mod state;
 mod api;
+mod credentials;
 
 use config::Server;
 use gpui::*;
 use gpui_component::*;
 use state::AppState;
-use views::{AddServerView, LoginView, ServerListView};
+use views::{AddServerView, AppLayout, LoginView, ServerListView, UserSelectionView};
 
 struct CrabfinApp {
     state: Entity<AppState>,
@@ -77,17 +78,16 @@ impl CrabfinApp {
                                                     id: info.id,
                                                     name: info.server_name,
                                                     url: url.clone(),
-                                                    access_token: None,
-                                                    user_id: None,
+                                                    saved_users: Vec::new(),
                                                 };
 
-                                                app.state.update(cx, |state, cx| {
+                                                app.state.update(cx, |state, _cx| {
                                                     state.config.add_server(server);
                                                     let _ = state.config.save();
                                                 });
 
                                                 // Navigate to login
-                                                app.active_view = Self::create_login_view(weak_app.clone(), url, window, cx);
+                                                app.active_view = Self::create_login_view(weak_app.clone(), url, None, window, cx);
                                                 cx.notify();
                                             }).ok();
                                         }
@@ -120,21 +120,22 @@ impl CrabfinApp {
             .into()
     }
 
-    fn create_login_view(weak_app: WeakEntity<Self>, url: String, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
+    fn create_login_view(weak_app: WeakEntity<Self>, url: String, username: Option<String>, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
         cx.new(|cx| {
             LoginView::new(
                 window,
                 cx,
                 url.clone(),
+                username,
                 {
                     let weak_app = weak_app.clone();
                     let url = url.clone();
-                    move |username, password, window, cx| {
+                    move |username, password, remember_me, window, cx| {
                         let weak_app = weak_app.clone();
                         let url = url.clone();
                         let view = cx.weak_entity();
 
-                        cx.spawn_in(&*window, |_, mut cx: &mut AsyncWindowContext| {
+                        cx.spawn_in(&*window, move |_, mut cx: &mut AsyncWindowContext| {
                             let mut cx = cx.clone();
                             async move {
                                 let _ = view.update(&mut cx, |view, cx| {
@@ -146,16 +147,43 @@ impl CrabfinApp {
                                     Ok(auth_response) => {
                                         if let Some(app_entity) = weak_app.upgrade() {
                                             cx.update_window_entity(&app_entity, |app, window, cx| {
-                                                app.state.update(cx, |state, _cx| {
-                                                    if let Some(server) = state.config.servers.iter_mut().find(|s| s.url == url) {
-                                                        server.user_id = Some(auth_response.user.id);
-                                                        server.access_token = Some(auth_response.access_token);
-                                                        let _ = state.config.save();
-                                                    }
-                                                });
+                                                let user_id = auth_response.user.id.clone();
+                                                let access_token = auth_response.access_token.clone();
 
-                                                let servers = app.state.read(cx).config.servers.clone();
-                                                app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                                                let (server_id, server_clone) = {
+                                                    let server = app.state.read(cx).config.servers.iter().find(|s| s.url == url).cloned();
+                                                    if let Some(s) = server {
+                                                        (Some(s.id.clone()), Some(s))
+                                                    } else {
+                                                        (None, None)
+                                                    }
+                                                };
+
+                                                if let Some(server_id) = server_id {
+                                                    if remember_me {
+                                                        app.state.update(cx, |state, _cx| {
+                                                            // Add saved user to config
+                                                            state.config.add_saved_user(&server_id, username.clone(), user_id.clone());
+                                                            let _ = state.config.save();
+                                                        });
+
+                                                        // Save token to keyring (run async in background)
+                                                        let url_for_keyring = url.clone();
+                                                        let user_id_for_keyring = user_id.clone();
+                                                        let token_for_keyring = access_token.clone();
+                                                        cx.spawn_in(&*window, |_, _cx: &mut AsyncWindowContext| async move {
+                                                            let _ = credentials::write_token(&url_for_keyring, &user_id_for_keyring, &token_for_keyring).await;
+                                                        }).detach();
+                                                    }
+
+                                                    if let Some(server) = server_clone {
+                                                        app.active_view = Self::create_app_layout_view(weak_app.clone(), server, window, cx);
+                                                    }
+                                                } else {
+                                                    // Server not found, return to server list
+                                                    let servers = app.state.read(cx).config.servers.clone();
+                                                    app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                                                }
                                                 cx.notify();
                                             }).ok();
                                         }
@@ -198,19 +226,8 @@ impl CrabfinApp {
                 {
                     let weak_app = weak_app.clone();
                     move |server, window, cx| {
-                        let server_url = server.url.clone();
-                        let access_token = server.access_token.clone();
-
                         let _ = weak_app.update(cx, |app, cx| {
-                            if access_token.is_some() {
-                                // Already logged in, navigate to main content
-                                // For now, just go to a dummy login view (or dashboard in future)
-                                // Re-using login view for now as placeholder for "Connected" state
-                                app.active_view = Self::create_login_view(weak_app.clone(), server_url, window, cx);
-                            } else {
-                                // Not logged in, navigate to login view
-                                app.active_view = Self::create_login_view(weak_app.clone(), server_url, window, cx);
-                            }
+                            app.active_view = Self::create_user_selection_view(weak_app.clone(), server.clone(), window, cx);
                             cx.notify();
                         });
                     }
@@ -250,6 +267,77 @@ impl CrabfinApp {
             )
         })
             .into()
+    }
+
+    fn create_app_layout_view(_weak_app: WeakEntity<Self>, server: Server, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
+        cx.new(|cx| {
+            AppLayout::new(server, window, cx)
+        }).into()
+    }
+
+    fn create_user_selection_view(weak_app: WeakEntity<Self>, server: Server, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
+        cx.new(|cx| {
+            UserSelectionView::new(
+                server.clone(),
+                window,
+                cx,
+                {
+                    let weak_app = weak_app.clone();
+                    let server = server.clone();
+                    move |user, window, cx| {
+                        let server = server.clone();
+                        let weak_app = weak_app.clone();
+                        let _ = weak_app.update(cx, |app, cx| {
+                            // Check for saved token in keyring
+                            let server_url = server.url.clone();
+                            let user_id = user.user_id.clone();
+                            let username = user.username.clone();
+
+                            let weak_app_for_spawn = weak_app.clone();
+                            let server_url_for_async = server_url.clone();
+                            let user_id_for_async = user_id.clone();
+
+                            cx.spawn_in(&*window, move |_, cx: &mut AsyncWindowContext| {
+                                let weak_app = weak_app_for_spawn.clone();
+                                let server_url = server_url_for_async.clone();
+                                let user_id = user_id_for_async.clone();
+                                let mut cx = cx.clone();
+                                async move {
+                                    if let Ok(_token) = credentials::read_token(&server_url, &user_id).await {
+                                        // Token found, try to auto-login (or just navigate to app layout if we trust the token)
+                                        // For now, let's assume token is valid and navigate to app layout
+                                        // In a real app, we should validate the token with the server first
+
+                                        let _ = cx.update_window_entity(&weak_app.upgrade().unwrap(), |app, window, cx| {
+                                            if let Some(server) = app.state.read(cx).config.servers.iter().find(|s| s.url == server_url).cloned() {
+                                                app.active_view = Self::create_app_layout_view(weak_app, server, window, cx);
+                                                cx.notify();
+                                            }
+                                        });
+                                    } else {
+                                        // No token found or error reading it, navigate to login
+                                        let _ = cx.update_window_entity(&weak_app.upgrade().unwrap(), |app, window, cx| {
+                                            app.active_view = Self::create_login_view(weak_app, server_url, Some(username), window, cx);
+                                            cx.notify();
+                                        });
+                                    }
+                                }
+                            }).detach();
+                        });
+                    }
+                },
+                {
+                    let weak_app = weak_app.clone();
+                    move |window, cx| {
+                        let _ = weak_app.update(cx, |app, cx| {
+                            let servers = app.state.read(cx).config.servers.clone();
+                            app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                            cx.notify();
+                        });
+                    }
+                },
+            )
+        }).into()
     }
 }
 

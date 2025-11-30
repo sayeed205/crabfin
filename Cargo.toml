@@ -50,6 +50,9 @@ image = "0.25"
 # Platform-specific dependencies
 dirs = "6"
 
+# Secure credential storage
+oo7 = "0.3"
+
 # Wallpaper detection
 wallpaper = "3"
 unicode-segmentation = "1.12.0"

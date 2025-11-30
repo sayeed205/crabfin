@@ -4,12 +4,18 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SavedUser {
+    pub username: String,
+    pub user_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Server {
     pub id: String,
     pub name: String,
     pub url: String,
-    pub access_token: Option<String>,
-    pub user_id: Option<String>,
+    #[serde(default)]
+    pub saved_users: Vec<SavedUser>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -62,5 +68,27 @@ impl Config {
         self.active_server_id.as_ref().and_then(|id| {
             self.servers.iter().find(|s| &s.id == id)
         })
+    }
+    pub fn add_saved_user(&mut self, server_id: &str, username: String, user_id: String) {
+        if let Some(server) = self.servers.iter_mut().find(|s| s.id == server_id) {
+            // Remove existing user with same ID
+            server.saved_users.retain(|u| u.user_id != user_id);
+            // Add new user
+            server.saved_users.push(SavedUser { username, user_id });
+        }
+    }
+
+    pub fn remove_saved_user(&mut self, server_id: &str, user_id: &str) {
+        if let Some(server) = self.servers.iter_mut().find(|s| s.id == server_id) {
+            server.saved_users.retain(|u| u.user_id != user_id);
+        }
+    }
+
+    pub fn get_saved_users(&self, server_id: &str) -> Vec<SavedUser> {
+        self.servers
+            .iter()
+            .find(|s| s.id == server_id)
+            .map(|s| s.saved_users.clone())
+            .unwrap_or_default()
     }
 }

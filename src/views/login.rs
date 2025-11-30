@@ -7,11 +7,12 @@ pub struct LoginView {
     username_input: Entity<InputState>,
     password_input: Entity<InputState>,
     server_url: String,
-    on_login: Box<dyn Fn(String, String, &mut Window, &mut Context<LoginView>) + 'static>,
+    on_login: Box<dyn Fn(String, String, bool, &mut Window, &mut Context<LoginView>) + 'static>,
     on_back: Box<dyn Fn(&mut Window, &mut Context<LoginView>) + 'static>,
     is_loading: bool,
     error_message: Option<String>,
     is_password_visible: bool,
+    remember_me: bool,
 }
 
 impl LoginView {
@@ -19,10 +20,17 @@ impl LoginView {
         window: &mut Window,
         cx: &mut Context<Self>,
         server_url: String,
-        on_login: impl Fn(String, String, &mut Window, &mut Context<LoginView>) + 'static,
+        username: Option<String>,
+        on_login: impl Fn(String, String, bool, &mut Window, &mut Context<LoginView>) + 'static,
         on_back: impl Fn(&mut Window, &mut Context<LoginView>) + 'static,
     ) -> Self {
-        let username_input = cx.new(|cx| InputState::new(window, cx).placeholder("Username"));
+        let username_input = cx.new(|cx| {
+            let mut input = InputState::new(window, cx).placeholder("Username");
+            if let Some(user) = username {
+                input.set_value(user, window, cx);
+            }
+            input
+        });
         let password_input = cx.new(|cx| InputState::new(window, cx).placeholder("Password").masked(true));
 
         Self {
@@ -34,6 +42,7 @@ impl LoginView {
             is_loading: false,
             error_message: None,
             is_password_visible: false,
+            remember_me: true,
         }
     }
 
@@ -86,6 +95,45 @@ impl Render for LoginView {
                                 cx.notify();
                             }))
                     )
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                div()
+                                    .w_4()
+                                    .h_4()
+                                    .rounded_sm()
+                                    .border_1()
+                                    .border_color(theme.border)
+                                    .when(self.remember_me, |this| {
+                                        this.bg(theme.primary)
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.primary_foreground)
+                                                    .child("✓")
+                                            )
+                                    })
+                                    .id("remember_me_checkbox")
+                                    .cursor_pointer()
+                                    .on_click(cx.listener(|this, _, _window, cx| {
+                                        this.remember_me = !this.remember_me;
+                                        cx.notify();
+                                    }))
+                            )
+                            .child(
+                                div()
+                                    .id("remember_me_label")
+                                    .text_sm()
+                                    .child("Remember me")
+                                    .cursor_pointer()
+                                    .on_click(cx.listener(|this, _, _window, cx| {
+                                        this.remember_me = !this.remember_me;
+                                        cx.notify();
+                                    }))
+                            )
+                    )
                     .children(self.error_message.as_ref().map(|msg| {
                         div().text_sm().text_color(theme.danger).child(msg.clone())
                     }))
@@ -109,8 +157,9 @@ impl Render for LoginView {
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         let username = this.username_input.read(cx).value();
                                         let password = this.password_input.read(cx).value();
+                                        let remember_me = this.remember_me;
                                         if !username.is_empty() {
-                                            (this.on_login)(username.to_string(), password.to_string(), window, cx);
+                                            (this.on_login)(username.to_string(), password.to_string(), remember_me, window, cx);
                                         }
                                     }))
                             )

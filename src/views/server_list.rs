@@ -80,7 +80,7 @@ impl Render for ServerListView {
                             )
                             .child(
                                 Button::new("delete")
-                                    .icon(IconName::Close)
+                                    .icon(IconName::Delete)
                                     .ghost()
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         (this.on_delete)(&server_delete, window, cx);
