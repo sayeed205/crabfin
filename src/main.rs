@@ -1,61 +1,41 @@
-//! Crabfin - Native Client
-//!
-//! A modern, native desktop application for accessing media servers
-//! built with Rust and GPUI.
+use gpui::*;
+use gpui_component::{button::*, *};
 
-use anyhow::Result;
-use tracing::{error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-mod app;
-mod client;
-mod auth;
-mod ui;
-mod models;
-mod services;
-mod utils;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize tracing subscriber for structured logging
-    init_logging()?;
-
-    info!("Starting Crabfin - Native Client");
-
-    // Run the main application
-    match run_app().await {
-        Ok(_) => {
-            info!("Application shutdown successfully");
-            Ok(())
-        }
-        Err(e) => {
-            error!("Application error: {:#}", e);
-            Err(e)
-        }
+pub struct Example;
+impl Render for Example {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .v_flex()
+            .gap_2()
+            .size_full()
+            .items_center()
+            .justify_center()
+            .child("Hello, World!")
+            .child(
+                Button::new("ok")
+                    .primary()
+                    .label("Let's Go!")
+                    .on_click(|_, _, _| println!("Clicked!")),
+            )
     }
 }
 
-/// Initialize the tracing subscriber for logging
-fn init_logging() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "crabfin=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .try_init()
-        .map_err(|e| anyhow::anyhow!("Failed to initialize logging: {}", e))?;
+fn main() {
+    let app = Application::new();
 
-    Ok(())
-}
+    app.run(move |cx| {
+        // This must be called before using any GPUI Component features.
+        gpui_component::init(cx);
 
-/// Main application entry point
-async fn run_app() -> Result<()> {
-    info!("Initializing application components");
+        cx.spawn(async move |cx| {
+            cx.open_window(WindowOptions::default(), |window, cx| {
+                let view = cx.new(|_| Example);
+                // This first level on the window, should be a Root.
+                cx.new(|cx| Root::new(view, window, cx))
+            })?;
 
-    // Run the GPUI application
-    app::run_crabfin_app().await?;
-
-    info!("Application shutdown successfully");
-    Ok(())
+            Ok::<_, anyhow::Error>(())
+        })
+            .detach();
+    });
 }
