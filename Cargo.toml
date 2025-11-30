@@ -9,7 +9,8 @@ authors = ["Sayed Ahmed <sayeed205@gmail.com>"]
 
 [dependencies]
 # UI Framework
-gpui = { git = "https://github.com/zed-industries/zed" }
+gpui = "0.2"
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
