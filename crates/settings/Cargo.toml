@@ -1,0 +1,17 @@
+[package]
+name = "settings"
+version = "0.1.0"
+description = "Settings and configuration for Crabfin"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/settings.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+dirs.workspace = true
+anyhow.workspace = true

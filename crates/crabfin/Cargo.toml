@@ -1,0 +1,18 @@
+[package]
+name = "crabfin"
+version = "0.1.0"
+description = "A native Jellyfin client built with Rust and GPUI"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+gpui.workspace = true
+jellyfin.workspace = true
+ui.workspace = true
+theme.workspace = true
+settings.workspace = true
+credentials.workspace = true
+assets.workspace = true
+video_player.workspace = true

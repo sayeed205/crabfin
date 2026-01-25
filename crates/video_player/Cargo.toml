@@ -1,0 +1,14 @@
+[package]
+name = "video_player"
+version = "0.1.0"
+description = "Video playback abstraction for Crabfin"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/video_player.rs"
+
+[dependencies]
+gpui.workspace = true

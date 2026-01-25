@@ -1,0 +1,14 @@
+[package]
+name = "theme"
+version = "0.1.0"
+description = "Theme definitions for Crabfin"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/theme.rs"
+
+[dependencies]
+gpui.workspace = true
