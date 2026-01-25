@@ -2,6 +2,15 @@
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/crates/assets/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/crabfin/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/credentials/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/jellyfin/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/jellyfin/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/settings/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/theme/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ui/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/video_player/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
