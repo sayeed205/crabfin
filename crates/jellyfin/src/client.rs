@@ -56,7 +56,21 @@ pub struct Client {
     auth_header: AuthorizationHeader,
 }
 
+use crate::system;
+
 impl Client {
+    pub async fn validate_server(&self) -> Result<bool> {
+        match system::get_public_info(self).await {
+            Ok(_) => Ok(true),
+            Err(e) => match e {
+                JellyfinError::Network(_) | JellyfinError::ServerNotFound => {
+                    Err(JellyfinError::ServerNotFound)
+                }
+                _ => Err(e),
+            },
+        }
+    }
+
     pub async fn get(&self, path: &str) -> Result<reqwest::Response> {
         let url = format!("{}{}", self.base_url, path);
         let auth = self.auth_header.build();
@@ -156,4 +170,17 @@ mod tests {
 
         assert!(client.auth_header.build().starts_with("Emby "));
     }
+
+    #[tokio::test]
+    async fn test_validate_server_success() {
+        let client = ClientBuilder::new("http://localhost:8096")
+            .unwrap()
+            .build()
+            .unwrap();
+        
+        let valid = client.validate_server().await;
+        assert!(valid.is_ok());
+        assert!(valid.unwrap());
+    }
 }
+
