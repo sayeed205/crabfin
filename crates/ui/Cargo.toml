@@ -12,4 +12,10 @@ path = "src/ui.rs"
 
 [dependencies]
 gpui.workspace = true
+jellyfin.workspace = true
+settings.workspace = true
 theme.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing.workspace = true
+unicode-segmentation.workspace = true
+uuid.workspace = true

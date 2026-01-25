@@ -12,6 +12,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/ui/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/video_player/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/settings/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

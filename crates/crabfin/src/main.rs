@@ -3,27 +3,15 @@ use gpui::{
     WindowBounds, WindowOptions,
 };
 
-struct CrabfinApp {
-    title: SharedString,
-}
+mod app;
 
-impl Render for CrabfinApp {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .bg(rgb(0x1e1e2e))
-            .size_full()
-            .justify_center()
-            .items_center()
-            .text_xl()
-            .text_color(rgb(0xcdd6f4))
-            .child(format!("{}", &self.title))
-    }
-}
+// struct CrabfinApp removed
 
 fn main() {
     Application::new().run(|cx: &mut App| {
+        app::setup_config(cx);
+        ui::components::text_input::bind_actions(cx);
+
         let bounds = Bounds::centered(None, size(px(1024.), px(768.)), cx);
         cx.open_window(
             WindowOptions {
@@ -34,11 +22,7 @@ fn main() {
                 }),
                 ..Default::default()
             },
-            |_, cx| {
-                cx.new(|_| CrabfinApp {
-                    title: "Crabfin".into(),
-                })
-            },
+            |_, cx| cx.new(|_| app::CrabfinApp),
         )
         .unwrap();
         cx.activate(true);
