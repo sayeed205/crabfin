@@ -15,3 +15,10 @@ serde.workspace = true
 serde_json.workspace = true
 dirs.workspace = true
 anyhow.workspace = true
+keyring.workspace = true
+notify.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+credentials.workspace = true

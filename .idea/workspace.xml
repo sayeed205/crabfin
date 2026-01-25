@@ -32,8 +32,13 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4a37c21c-de6a-40bd-825d-61bac99ed8c5" name="Changes" comment="Update `.idea` config: refine change list and task updates">
+    <list default="true" id="4a37c21c-de6a-40bd-825d-61bac99ed8c5" name="Changes" comment="Switch `.idea` build profile to test, add integration test configuration">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/credentials/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/credentials/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/jellyfin/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/jellyfin/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/settings/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/settings/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/settings/src/settings.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/settings/src/settings.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -41,24 +46,25 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="10896" />
+    <option name="cachedIndexableFilesCount" value="10919" />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:test" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "sayeed205"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;sayeed205&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "git@github.com:sayeed205/crabfin.git",
-    "accountId": "8a21c829-4846-4be9-81ed-f76eee0b2174"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:sayeed205/crabfin.git&quot;,
+    &quot;accountId&quot;: &quot;8a21c829-4846-4be9-81ed-f76eee0b2174&quot;
   }
-}]]></component>
+}</component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="C3K7DaKz" />
   </component>
@@ -66,42 +72,42 @@
     <commands />
     <urls />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 4
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 4
+}</component>
   <component name="ProjectId" id="38kDCk08BmE6YCfeQZLlrvX0lAX" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Cargo.Run crabfin.executor": "Run",
-    "Cargo.Test test_integration_get_system_info_public.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.rust.reset.selective.auto.import": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "master",
-    "javascript.preferred.runtime.type.id": "node",
-    "junie.onboarding.icon.badge.shown": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "pnpm",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
-    "org.rust.first.attach.projects": "true",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.Run crabfin.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test test_integration_get_system_info_public.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="Cargo.Test test_integration_get_system_info_public">
     <configuration name="Run crabfin" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="buildProfileId" value="dev" />
@@ -172,7 +178,8 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1769334551585</updated>
-      <workItem from="1769334552065" duration="4942000" />
+      <workItem from="1769334552065" duration="5912000" />
+      <workItem from="1769340487204" duration="751000" />
     </task>
     <task id="LOCAL-00001" summary="feat(app): add auto-login and improve server/user management (master)&#10;&#10;- Implement auto-login with last connected user&#10;- Add last_connected_user_id to Config, with set/clear methods&#10;- Update active_server handling and saving in state&#10;- Refactor AppLayout/AppSidebar to allow logout logic&#10;- Sidebar now provides logout button to clear user and return to selection&#10;- Clean up unused .idea files and update vcs.xml&#10;- Add .idea/workspace.xml for IDE configuration">
       <option name="closed" value="true" />
@@ -198,14 +205,21 @@
       <option name="project" value="LOCAL" />
       <updated>1769339241375</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Switch `.idea` build profile to test, add integration test configuration">
+      <option name="closed" value="true" />
+      <created>1769339786737</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1769339786740</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Here is a conventional commit message based on your staged changes:&#10;&#10;```&#10;feat(jellyfin,terminal,gpui-video-player): add Video player crate, &#10;improve terminal exit handling, and implement Jellyfin client (main)&#10;&#10;- Add new `gpui-video-player` crate for GStreamer-based video playback in GPUI apps:&#10;  - Includes library, usage examples, docs, and license&#10;  - Supports playback, controls, and platform-optimized rendering&#10;- Update `.gitignore` for new and temp files&#10;- Add and wire up Jellyfin Rust client:&#10;  - Implement auth, device ID, error handling, and HTTP client&#10;  - Add integration test for Jellyfin `/System/Info/Public`&#10;  - Update Cargo.toml with dependencies (`uuid`, `hostname`)&#10;- Update Alacritty terminal dependency to custom git source in zed&#10;- Refactor `terminal.rs` to:&#10;  - Properly parse/handle child process exit codes and signals&#10;  - Display signal-based exits (Unix)&#10;  - Fix memory safety and test coverage for exit status&#10;- Update project/IDE config to reflect new crates and source folders&#10;```&#10;&#10;*Commit title follows the `type(scope): description (branch)` format, as your branch is `main`.  &#10;*Lines are wrapped at 74 characters.  &#10;*This message summarizes all the major staged changes:  &#10;- New video player crate  &#10;- Jellyfin client  &#10;- Terminal process exit improvements" />
     <MESSAGE value="Here is a conventional commit message based on your staged changes:&#10;&#10;```&#10;feat(jellyfin,terminal,gpui-video-player): add Video player crate, &#10;improve terminal exit handling, and implement Jellyfin client (main)&#10;&#10;- Add new `gpui-video-player` crate for GStreamer-based video playback in GPUI apps:&#10;  - Includes library, usage examples, docs, and license&#10;  - Supports playback, controls, and platform-optimized rendering&#10;- Update `.gitignore` for new and temp files&#10;- Add and wire up Jellyfin Rust client:&#10;  - Implement auth, device ID, error handling, and HTTP client&#10;  - Add integration test for Jellyfin `/System/Info/Public`&#10;  - Update Cargo.toml with dependencies (`uuid`, `hostname`)&#10;- Update Alacritty terminal dependency to custom git source in zed&#10;- Refactor `terminal.rs` to:&#10;  - Properly parse/handle child process exit codes and signals&#10;  - Display signal-based exits (Unix)&#10;  - Fix memory safety and test coverage for exit status&#10;- Update project/IDE config to reflect new crates and source folders&#10;```&#10;&#10;*Commit title follows the `type(scope): description (branch)` format, as your branch is `main`.  &#10;*Lines are wrapped at 74 characters.  &#10;*This message summarizes all the major staged changes:  &#10;- New video player crate  &#10;- Jellyfin client  &#10;- Terminal process exit improvements  &#10;-" />
     <MESSAGE value="Here is a conventional commit message based on your staged changes:&#10;&#10;```&#10;feat(jellyfin,terminal,gpui-video-player): add Video player crate, &#10;improve terminal exit handling, and implement Jellyfin client (main)&#10;&#10;- Add new `gpui-video-player` crate for GStreamer-based video playback in GPUI apps:&#10;  - Includes library, usage examples, docs, and license&#10;  - Supports playback, controls, and platform-optimized rendering&#10;- Update `.gitignore` for new and temp files&#10;- Add and wire up Jellyfin Rust client:&#10;  - Implement auth, device ID, error handling, and HTTP client&#10;  - Add integration test for Jellyfin `/System/Info/Public`&#10;  - Update Cargo.toml with dependencies (`uuid`, `hostname`)&#10;- Update Alacritty terminal dependency to custom git source in zed&#10;- Refactor `terminal.rs` to:&#10;  - Properly parse/handle child process exit codes and signals&#10;  - Display signal-based exits (Unix)&#10;  - Fix memory safety and test coverage for exit status&#10;- Update project/IDE config to reflect new crates and source folders&#10;```&#10;&#10;*Commit title follows the `type(scope): description (branch)` format, as your branch is `main`.  &#10;*Lines are wrapped at 74 characters.  &#10;*This message summarizes all the major staged changes:  &#10;- New video player crate  &#10;- Jellyfin client  &#10;- Terminal process exit improvements  &#10;- Dependency" />
     <MESSAGE value="Here is a conventional commit message based on your staged changes:&#10;&#10;```&#10;feat(jellyfin,terminal,gpui-video-player): add Video player crate, &#10;improve terminal exit handling, and implement Jellyfin client (main)&#10;&#10;- Add new `gpui-video-player` crate for GStreamer-based video playback in GPUI apps:&#10;  - Includes library, usage examples, docs, and license&#10;  - Supports playback, controls, and platform-optimized rendering&#10;- Update `.gitignore` for new and temp files&#10;- Add and wire up Jellyfin Rust client:&#10;  - Implement auth, device ID, error handling, and HTTP client&#10;  - Add integration test for Jellyfin `/System/Info/Public`&#10;  - Update Cargo.toml with dependencies (`uuid`, `hostname`)&#10;- Update Alacritty terminal dependency to custom git source in zed&#10;- Refactor `terminal.rs` to:&#10;  - Properly parse/handle child process exit codes and signals&#10;  - Display signal-based exits (Unix)&#10;  - Fix memory safety and test coverage for exit status&#10;- Update project/IDE config to reflect new crates and source folders&#10;```&#10;&#10;*Commit title follows the `type(scope): description (branch)` format, as your branch is `main`.  &#10;*Lines are wrapped at 74 characters.  &#10;*This message summarizes all the major staged changes:  &#10;- New video player crate  &#10;- Jellyfin client  &#10;- Terminal process exit improvements  &#10;- Dependency updates" />
@@ -230,6 +244,7 @@
     <MESSAGE value="Here is a conventional commit message based on your staged changes:&#10;&#10;```&#10;feat(jellyfin,terminal,gpui-video-player): add Video player crate, &#10;improve terminal exit handling, and implement Jellyfin client (main)&#10;&#10;- Add new `gpui-video-player` crate for GStreamer-based video playback in GPUI apps:&#10;  - Includes library, usage examples, docs, and license&#10;  - Supports playback, controls, and platform-optimized rendering&#10;- Update `.gitignore` for new and temp files&#10;- Add and wire up Jellyfin Rust client:&#10;  - Implement auth, device ID, error handling, and HTTP client&#10;  - Add integration test for Jellyfin `/System/Info/Public`&#10;  - Update Cargo.toml with dependencies (`uuid`, `hostname`)&#10;- Update Alacritty terminal dependency to custom git source in zed&#10;- Refactor `terminal.rs` to:&#10;  - Properly parse/handle child process exit codes and signals&#10;  - Display signal-based exits (Unix)&#10;  - Fix memory safety and test coverage for exit status&#10;- Update project/IDE config to reflect new crates and source folders&#10;```&#10;&#10;*Commit title follows the `type(scope): description (branch)` format, as your branch is `main`.  &#10;*Lines are wrapped at 74 characters.  &#10;*This message summarizes all the major staged changes:  &#10;- New video player crate  &#10;- Jellyfin client  &#10;- Terminal process exit improvements  &#10;- Dependency updates and project configuration.*&#10;&#10;Let me know if you want a shorter message or just the title line!" />
     <MESSAGE value="Update `.idea` config: include additional source folders and enable default features for crates" />
     <MESSAGE value="Update `.idea` config: refine change list and task updates" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update `.idea` config: refine change list and task updates" />
+    <MESSAGE value="Switch `.idea` build profile to test, add integration test configuration" />
+    <option name="LAST_COMMIT_MESSAGE" value="Switch `.idea` build profile to test, add integration test configuration" />
   </component>
 </project>

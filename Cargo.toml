@@ -105,7 +105,21 @@ dirs = "6"
 # Secure credential storage
 #
 
+keyring = "3"
 oo7 = "0.5"
+
+#
+# File watching
+#
+
+notify = "8"
+
+#
+# Utilities
+#
+
+uuid = { version = "1", features = ["v4", "serde"] }
+tempfile = "3"
 
 #
 # Wallpaper detection
