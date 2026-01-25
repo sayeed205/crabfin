@@ -22,6 +22,7 @@ pub struct Server {
 pub struct Config {
     pub servers: Vec<Server>,
     pub active_server_id: Option<String>,
+    pub last_connected_user_id: Option<String>,
 }
 
 impl Config {
@@ -69,12 +70,32 @@ impl Config {
             self.servers.iter().find(|s| &s.id == id)
         })
     }
+
+    pub fn set_active_server(&mut self, server_id: String) {
+        self.active_server_id = Some(server_id);
+    }
+
+    pub fn set_last_connected_user(&mut self, user_id: String) {
+        self.last_connected_user_id = Some(user_id);
+    }
+
+    pub fn clear_active_server(&mut self) {
+        self.active_server_id = None;
+        self.last_connected_user_id = None;
+    }
+    
+    pub fn clear_last_connected_user(&mut self) {
+        self.last_connected_user_id = None;
+    }
+
     pub fn add_saved_user(&mut self, server_id: &str, username: String, user_id: String) {
         if let Some(server) = self.servers.iter_mut().find(|s| s.id == server_id) {
-            // Remove existing user with same ID
-            server.saved_users.retain(|u| u.user_id != user_id);
-            // Add new user
-            server.saved_users.push(SavedUser { username, user_id });
+            if !server.saved_users.iter().any(|u| u.user_id == user_id) {
+                server.saved_users.push(SavedUser {
+                    username,
+                    user_id,
+                });
+            }
         }
     }
 

@@ -21,11 +21,49 @@ impl CrabfinApp {
         let state = cx.new(|_| AppState::new());
         let weak_app = cx.weak_entity();
 
-        let active_view = if state.read(cx).config.servers.is_empty() {
+        let config = state.read(cx).config.clone();
+        let active_server = config.active_server_id.as_ref()
+            .and_then(|id| config.servers.iter().find(|s| &s.id == id).cloned());
+
+        let active_view = if let Some(server) = active_server {
+            // We have an active server, start with UserSelectionView
+            // Check for last connected user to auto-login
+            if let Some(user_id) = config.last_connected_user_id.clone() {
+                if let Some(user) = server.saved_users.iter().find(|u| u.user_id == user_id).cloned() {
+                     let weak_app = weak_app.clone();
+                     let server_url = server.url.clone();
+                     let user_id = user.user_id.clone();
+                     let username = user.username.clone();
+                     let server_clone = server.clone();
+
+                     cx.spawn_in(&*window, move |_, cx: &mut AsyncWindowContext| {
+                        let weak_app = weak_app.clone();
+                        let server_url = server_url.clone();
+                        let user_id = user_id.clone();
+                        let mut cx = cx.clone();
+                        async move {
+                            if let Ok(_token) = credentials::read_token(&server_url, &user_id).await {
+                                let _ = cx.update_window_entity(&weak_app.upgrade().unwrap(), |app, window, cx| {
+                                    app.active_view = Self::create_app_layout_view(weak_app.clone(), server_clone, window, cx);
+                                    cx.notify();
+                                });
+                            } else {
+                                // Token invalid or missing, go to login
+                                let _ = cx.update_window_entity(&weak_app.upgrade().unwrap(), |app, window, cx| {
+                                    app.active_view = Self::create_login_view(weak_app.clone(), server_url, Some(username), window, cx);
+                                    cx.notify();
+                                });
+                            }
+                        }
+                     }).detach();
+                }
+            }
+            
+            Self::create_user_selection_view(weak_app.clone(), server, window, cx)
+        } else if config.servers.is_empty() {
             Self::create_add_server_view(weak_app.clone(), window, cx)
         } else {
-            let servers = state.read(cx).config.servers.clone();
-            Self::create_server_list_view(weak_app.clone(), servers, window, cx)
+            Self::create_server_list_view(weak_app.clone(), config.servers, window, cx)
         };
 
         cx.observe(&state, |_, _, cx| {
@@ -227,6 +265,12 @@ impl CrabfinApp {
                     let weak_app = weak_app.clone();
                     move |server, window, cx| {
                         let _ = weak_app.update(cx, |app, cx| {
+                            // Save active server
+                            app.state.update(cx, |state, _cx| {
+                                state.config.set_active_server(server.id.clone());
+                                let _ = state.config.save();
+                            });
+                            
                             app.active_view = Self::create_user_selection_view(weak_app.clone(), server.clone(), window, cx);
                             cx.notify();
                         });
@@ -269,9 +313,30 @@ impl CrabfinApp {
             .into()
     }
 
-    fn create_app_layout_view(_weak_app: WeakEntity<Self>, server: Server, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
+    fn create_app_layout_view(weak_app: WeakEntity<Self>, server: Server, window: &mut Window, cx: &mut Context<Self>) -> AnyView {
         cx.new(|cx| {
-            AppLayout::new(server, window, cx)
+            AppLayout::new(
+                server.clone(),
+                window,
+                cx,
+                {
+                    let weak_app = weak_app.clone();
+                    let server = server.clone();
+                    move |window, cx| {
+                        let server = server.clone();
+                        let _ = weak_app.update(cx, |app, cx| {
+                            // Clear last connected user
+                            app.state.update(cx, |state, _cx| {
+                                state.config.clear_last_connected_user();
+                                let _ = state.config.save();
+                            });
+
+                            app.active_view = Self::create_user_selection_view(weak_app.clone(), server, window, cx);
+                            cx.notify();
+                        });
+                    }
+                }
+            )
         }).into()
     }
 
@@ -304,11 +369,14 @@ impl CrabfinApp {
                                 let mut cx = cx.clone();
                                 async move {
                                     if let Ok(_token) = credentials::read_token(&server_url, &user_id).await {
-                                        // Token found, try to auto-login (or just navigate to app layout if we trust the token)
-                                        // For now, let's assume token is valid and navigate to app layout
-                                        // In a real app, we should validate the token with the server first
-
+                                        // Token found, try to auto-login
                                         let _ = cx.update_window_entity(&weak_app.upgrade().unwrap(), |app, window, cx| {
+                                            // Save last connected user
+                                            app.state.update(cx, |state, _cx| {
+                                                state.config.set_last_connected_user(user_id.clone());
+                                                let _ = state.config.save();
+                                            });
+
                                             if let Some(server) = app.state.read(cx).config.servers.iter().find(|s| s.url == server_url).cloned() {
                                                 app.active_view = Self::create_app_layout_view(weak_app, server, window, cx);
                                                 cx.notify();
@@ -330,14 +398,26 @@ impl CrabfinApp {
                     let weak_app = weak_app.clone();
                     move |window, cx| {
                         let _ = weak_app.update(cx, |app, cx| {
+                            // Clear active server when going back
+                            app.state.update(cx, |state, _cx| {
+                                state.config.clear_active_server();
+                                let _ = state.config.save();
+                            });
+
+                            // If we have servers, go back to list, else add server
                             let servers = app.state.read(cx).config.servers.clone();
-                            app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                            if !servers.is_empty() {
+                                app.active_view = Self::create_server_list_view(weak_app.clone(), servers, window, cx);
+                            } else {
+                                app.active_view = Self::create_add_server_view(weak_app.clone(), window, cx);
+                            }
                             cx.notify();
                         });
                     }
                 },
             )
-        }).into()
+        })
+            .into()
     }
 }
 

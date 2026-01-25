@@ -7,8 +7,13 @@ pub struct AppLayout {
 }
 
 impl AppLayout {
-    pub fn new(server: Server, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let sidebar = cx.new(|_cx| AppSidebar::new(server));
+    pub fn new(
+        server: Server,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        on_logout: impl Fn(&mut Window, &mut Context<AppSidebar>) + 'static,
+    ) -> Self {
+        let sidebar = cx.new(|_cx| AppSidebar::new(server, on_logout));
         Self { sidebar }
     }
 }
