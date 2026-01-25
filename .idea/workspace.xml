@@ -33,9 +33,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4a37c21c-de6a-40bd-825d-61bac99ed8c5" name="Changes" comment="feat(settings,credentials): implement config and credential storage&#10;&#10;- Implemented settings management in `crates/settings`, including:&#10;  - Serializable `Config`, `ServerConfig`, `UserConfig` structs&#10;  - Load/save, add/remove servers/users, versioning&#10;  - File watching for config hot-reload with `notify`&#10;  - Extensive tests, integration test for workflow&#10;- Implemented secure token storage in `crates/credentials` using `keyring`&#10;  - `store_token`, `get_token`, `delete_token` functions&#10;  - Error handling, tests with `uuid` support&#10;- Updated `Cargo.toml` files to add dependencies:&#10;  - `keyring`, `notify`, `uuid`, `tempfile`&#10;- Updated workspace configuration for new dependencies&#10;- Added dev-dependencies and integration test in settings crate">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/crabfin/src/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/crabfin/src/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/crabfin/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/crabfin/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/ui/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/ui/src/prelude.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/prelude.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/ui/src/ui.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/ui.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ui/src/components/text_input.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/components/text_input.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ui/src/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/state.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ui/src/views/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/views/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/ui/src/views/server_list.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/ui/src/views/server_list.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,7 +48,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="10919" />
+    <option name="cachedIndexableFilesCount" value="10929" />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:test" />
   <component name="Git.Settings">
@@ -78,34 +83,35 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Cargo.Run crabfin.executor&quot;: &quot;Run&quot;,
-    &quot;Cargo.Test test_integration_get_system_info_public.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
-    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.Run crabfin.executor": "Run",
+    "Cargo.Test crabfin.executor": "Run",
+    "Cargo.Test test_integration_get_system_info_public.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.rust.reset.selective.auto.import": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "master",
+    "javascript.preferred.runtime.type.id": "node",
+    "junie.onboarding.icon.badge.shown": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "pnpm",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
+    "org.rust.first.attach.projects": "true",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RunManager" selected="Cargo.Test test_integration_get_system_info_public">
+}]]></component>
+  <component name="RunManager" selected="Cargo.Run crabfin">
     <configuration name="Run crabfin" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="buildProfileId" value="dev" />
       <option name="command" value="run --package crabfin --bin crabfin" />
@@ -125,6 +131,7 @@
       </method>
     </configuration>
     <configuration name="Test crabfin" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="buildProfileId" value="test" />
       <option name="command" value="test --workspace" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <envs />
@@ -141,29 +148,10 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test test_integration_get_system_info_public" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="buildProfileId" value="test" />
-      <option name="command" value="test --package jellyfin --test integration test_integration_get_system_info_public -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <envs />
-      <option name="emulateTerminal" value="true" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="buildTarget" value="REMOTE" />
-      <option name="backtrace" value="SHORT" />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Cargo.Test test_integration_get_system_info_public" />
-      </list>
-    </recent_temporary>
+    <list>
+      <item itemvalue="Cargo.Run crabfin" />
+      <item itemvalue="Cargo.Test crabfin" />
+    </list>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="/usr/bin" />
@@ -177,6 +165,7 @@
       <updated>1769334551585</updated>
       <workItem from="1769334552065" duration="5912000" />
       <workItem from="1769340487204" duration="2610000" />
+      <workItem from="1769360120356" duration="2589000" />
     </task>
     <task id="LOCAL-00001" summary="feat(app): add auto-login and improve server/user management (master)&#10;&#10;- Implement auto-login with last connected user&#10;- Add last_connected_user_id to Config, with set/clear methods&#10;- Update active_server handling and saving in state&#10;- Refactor AppLayout/AppSidebar to allow logout logic&#10;- Sidebar now provides logout button to clear user and return to selection&#10;- Clean up unused .idea files and update vcs.xml&#10;- Add .idea/workspace.xml for IDE configuration">
       <option name="closed" value="true" />

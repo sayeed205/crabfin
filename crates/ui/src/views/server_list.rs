@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::views::login::LoginView;
 
 pub struct ServerListView {
     focus_handle: FocusHandle,
@@ -10,7 +11,7 @@ impl ServerListView {
         cx.new(|_| Self { focus_handle })
     }
 
-    fn add_server(click: &ClickEvent, _window: &mut Window, cx: &mut App) {
+    fn add_server(_: &ClickEvent, _window: &mut Window, cx: &mut App) {
         cx.update_global::<AppStateGlobal, _>(|global, cx| {
             global.0.update(cx, |state, cx| {
                 let view = AddServerView::new(cx);
@@ -20,12 +21,20 @@ impl ServerListView {
         });
     }
 
+    fn connect_to_server(server: settings::ServerConfig, cx: &mut App) {
+        cx.update_global::<AppStateGlobal, _>(|global, cx| {
+            global.0.update(cx, |state, cx| {
+                let view = LoginView::new(server, cx);
+                state.current_view = AppView::Login(view);
+                cx.notify();
+            });
+        });
+    }
+
     fn remove_server(id: uuid::Uuid, cx: &mut App) {
         cx.update_global::<ConfigGlobal, _>(|config, cx| {
-            config.model.update(cx, |model, cx| {
+            config.model.update(cx, |model, _cx| {
                 model.remove_server(id);
-                // We should save here, but save is fallible. For now just unwrap or ignore error?
-                // Ideally propagate error or show toast.
                 let _ = model.save();
             });
         });
@@ -83,6 +92,7 @@ impl Render for ServerListView {
                         servers
                             .into_iter()
                             .map(|server| {
+                                let server_for_connect = server.clone();
                                 div()
                                     .flex()
                                     .justify_between()
@@ -107,14 +117,38 @@ impl Render for ServerListView {
                                             ),
                                     )
                                     .child(
-                                        button()
-                                            .size(ButtonSize::Regular)
-                                            .intent(ButtonIntent::Danger)
-                                            .child("Remove")
-                                            .id(SharedString::from(format!("remove-{}", server.id)))
-                                            .on_click(move |_, _, cx| {
-                                                Self::remove_server(server.id, cx);
-                                            }),
+                                        div()
+                                            .flex()
+                                            .gap_2()
+                                            .child(
+                                                button()
+                                                    .size(ButtonSize::Regular)
+                                                    .intent(ButtonIntent::Primary)
+                                                    .child("Connect")
+                                                    .id(SharedString::from(format!(
+                                                        "connect-{}",
+                                                        server.id
+                                                    )))
+                                                    .on_click(move |_, _, cx| {
+                                                        Self::connect_to_server(
+                                                            server_for_connect.clone(),
+                                                            cx,
+                                                        );
+                                                    }),
+                                            )
+                                            .child(
+                                                button()
+                                                    .size(ButtonSize::Regular)
+                                                    .intent(ButtonIntent::Danger)
+                                                    .child("Remove")
+                                                    .id(SharedString::from(format!(
+                                                        "remove-{}",
+                                                        server.id
+                                                    )))
+                                                    .on_click(move |_, _, cx| {
+                                                        Self::remove_server(server.id, cx);
+                                                    }),
+                                            ),
                                     )
                                     .into_any_element()
                             })

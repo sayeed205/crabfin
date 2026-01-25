@@ -11,6 +11,7 @@ authors.workspace = true
 path = "src/ui.rs"
 
 [dependencies]
+credentials.workspace = true
 gpui.workspace = true
 jellyfin.workspace = true
 settings.workspace = true

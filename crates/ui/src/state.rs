@@ -1,4 +1,4 @@
-use crate::views::{add_server::AddServerView, server_list::ServerListView};
+use crate::views::{add_server::AddServerView, login::LoginView, server_list::ServerListView};
 use gpui::*;
 use settings::{Config, SettingsWatcher};
 
@@ -13,6 +13,7 @@ impl Global for ConfigGlobal {}
 pub enum AppView {
     ServerList(Entity<ServerListView>),
     AddServer(Entity<AddServerView>),
+    Login(Entity<LoginView>),
 }
 
 pub struct AppState {

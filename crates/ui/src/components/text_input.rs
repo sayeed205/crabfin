@@ -63,6 +63,7 @@ pub struct TextInput {
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
     is_selecting: bool,
+    is_password: bool,
     scroll_handle: ScrollHandle,
 }
 
@@ -81,6 +82,24 @@ impl TextInput {
             last_layout: None,
             last_bounds: None,
             is_selecting: false,
+            is_password: false,
+            scroll_handle: ScrollHandle::new(),
+        })
+    }
+
+    pub fn new_password(cx: &mut App, placeholder: impl Into<SharedString>) -> Entity<Self> {
+        let focus_handle = cx.focus_handle();
+        cx.new(|_| Self {
+            focus_handle,
+            content: "".into(),
+            placeholder: placeholder.into(),
+            selected_range: 0..0,
+            selection_reversed: false,
+            marked_range: None,
+            last_layout: None,
+            last_bounds: None,
+            is_selecting: false,
+            is_password: true,
             scroll_handle: ScrollHandle::new(),
         })
     }
@@ -472,6 +491,10 @@ impl Element for TextElement {
 
         let (display_text, text_color) = if content.is_empty() {
             (input.placeholder.clone(), hsla(0., 0., 0., 0.5))
+        } else if input.is_password {
+            // Mask password content with bullet characters
+            let masked: String = "●".repeat(content.chars().count());
+            (masked.into(), style.color)
         } else {
             (content.clone(), style.color)
         };

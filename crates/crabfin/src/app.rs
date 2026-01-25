@@ -32,6 +32,7 @@ impl Render for CrabfinApp {
             .child(match view {
                 AppView::ServerList(v) => v.into_any_element(),
                 AppView::AddServer(v) => v.into_any_element(),
+                AppView::Login(v) => v.into_any_element(),
             })
     }
 }

@@ -1,11 +1,6 @@
-use gpui::{
-    div, prelude::*, px, rgb, size, App, Application, Bounds, Context, SharedString, Window,
-    WindowBounds, WindowOptions,
-};
+use gpui::{prelude::*, px, size, App, Application, Bounds, WindowBounds, WindowOptions};
 
 mod app;
-
-// struct CrabfinApp removed
 
 fn main() {
     Application::new().run(|cx: &mut App| {
