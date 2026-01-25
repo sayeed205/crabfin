@@ -1,6 +1,8 @@
 use crate::auth::AuthorizationHeader;
 use crate::device;
 use crate::error::{JellyfinError, Result};
+use crate::models::{AuthenticationResult};
+use crate::system;
 
 pub struct ClientBuilder {
     base_url: String,
@@ -56,8 +58,6 @@ pub struct Client {
     auth_header: AuthorizationHeader,
 }
 
-use crate::system;
-
 impl Client {
     pub async fn validate_server(&self) -> Result<bool> {
         match system::get_public_info(self).await {
@@ -101,6 +101,59 @@ impl Client {
     }
 }
 
+pub struct AuthenticatedClient {
+    base_url: String,
+    http_client: reqwest::Client,
+    auth_header: AuthorizationHeader,
+    access_token: String,
+    #[allow(dead_code)]
+    user_id: String,
+}
+
+impl AuthenticatedClient {
+    pub fn new(client: Client, auth_result: AuthenticationResult) -> Self {
+        let auth_header = client.auth_header.with_user_id(auth_result.user.id.clone());
+
+        Self {
+            base_url: client.base_url,
+            http_client: client.http_client,
+            auth_header,
+            access_token: auth_result.access_token,
+            user_id: auth_result.user.id,
+        }
+    }
+
+    pub async fn get(&self, path: &str) -> Result<reqwest::Response> {
+        let url = format!("{}{}", self.base_url, path);
+        let auth = self.auth_header.build();
+        
+        self.http_client
+            .get(&url)
+            .header("X-Emby-Authorization", auth)
+            .header("X-Emby-Token", &self.access_token)
+            .send()
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub async fn post_json<T: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> Result<reqwest::Response> {
+        let url = format!("{}{}", self.base_url, path);
+        let auth = self.auth_header.build();
+        
+        self.http_client
+            .post(&url)
+            .header("X-Emby-Authorization", auth)
+            .header("X-Emby-Token", &self.access_token)
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| e.into())
+    }
+}
 
 fn normalize_url(url: &str) -> Result<String> {
     let mut normalized = url.trim().to_string();
@@ -121,6 +174,7 @@ fn normalize_url(url: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::UserInfo;
 
     #[test]
     fn test_builder_creates_client() {
@@ -182,5 +236,28 @@ mod tests {
         assert!(valid.is_ok());
         assert!(valid.unwrap());
     }
-}
 
+    #[tokio::test]
+    async fn test_authenticated_client_includes_token() {
+        let client = ClientBuilder::new("http://httpbin.org")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let auth_result = AuthenticationResult {
+            user: UserInfo {
+                id: "user-123".into(),
+                name: "test".into(),
+                has_password: true,
+            },
+            access_token: "token-123".into(),
+            server_id: "server-123".into(),
+        };
+
+        let auth_client = AuthenticatedClient::new(client, auth_result);
+        
+        let res = auth_client.get("/get").await;
+        
+        assert!(res.is_ok());
+    }
+}
