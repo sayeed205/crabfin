@@ -27,6 +27,7 @@ pub struct UserConfig {
 pub struct AppSettings {
     pub last_server_id: Option<Uuid>,
     pub last_user_id: Option<String>,
+    pub default_server_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -117,6 +118,9 @@ impl Config {
         if self.settings.last_server_id == Some(id) {
             self.settings.last_server_id = None;
         }
+        if self.settings.default_server_id == Some(id) {
+            self.settings.default_server_id = None;
+        }
     }
 
     pub fn add_user(&mut self, user: UserConfig) {
@@ -139,6 +143,28 @@ impl Config {
         self.users
             .iter()
             .find(|u| u.id == id && u.server_id == server_id)
+    }
+
+    pub fn get_default_or_first_server(&self) -> Option<&ServerConfig> {
+        if let Some(id) = self.settings.default_server_id {
+            if let Some(server) = self.get_server(id) {
+                return Some(server);
+            }
+        }
+        self.servers.first()
+    }
+
+    pub fn get_users_for_server(&self, server_id: Uuid) -> Vec<&UserConfig> {
+        self.users
+            .iter()
+            .filter(|u| u.server_id == server_id)
+            .collect()
+    }
+
+    pub fn get_remember_me_user_for_server(&self, server_id: Uuid) -> Option<&UserConfig> {
+        self.users
+            .iter()
+            .find(|u| u.server_id == server_id && u.remember_me)
     }
 
     pub fn reload(&mut self) -> Result<()> {
@@ -240,6 +266,7 @@ mod tests {
         assert!(config.servers.is_empty());
         assert!(config.users.is_empty());
         assert!(config.settings.last_server_id.is_none());
+        assert!(config.settings.default_server_id.is_none());
     }
 
     #[test]
@@ -355,5 +382,69 @@ mod tests {
 
         let fresh = Config::load_from(&path).unwrap();
         assert_eq!(fresh.settings.last_user_id, Some("test".to_string()));
+    }
+
+    #[test]
+    fn test_config_helpers() {
+        let mut config = Config::default();
+        let s1_id = Uuid::new_v4();
+        let s2_id = Uuid::new_v4();
+
+        let s1 = ServerConfig {
+            id: s1_id,
+            name: "S1".to_string(),
+            url: "u1".to_string(),
+            device_id: Uuid::new_v4(),
+        };
+        let s2 = ServerConfig {
+            id: s2_id,
+            name: "S2".to_string(),
+            url: "u2".to_string(),
+            device_id: Uuid::new_v4(),
+        };
+        config.add_server(s1.clone());
+        config.add_server(s2.clone());
+
+        let u1 = UserConfig {
+            id: "u1".to_string(),
+            server_id: s1_id,
+            username: "user1".to_string(),
+            remember_me: false,
+        };
+        let u2 = UserConfig {
+            id: "u2".to_string(),
+            server_id: s1_id,
+            username: "user2".to_string(),
+            remember_me: true,
+        };
+        let u3 = UserConfig {
+            id: "u3".to_string(),
+            server_id: s2_id,
+            username: "user3".to_string(),
+            remember_me: false,
+        };
+        config.add_user(u1.clone());
+        config.add_user(u2.clone());
+        config.add_user(u3.clone());
+
+        assert_eq!(config.get_default_or_first_server(), Some(&s1));
+
+        config.settings.default_server_id = Some(s2_id);
+        assert_eq!(config.get_default_or_first_server(), Some(&s2));
+
+        config.settings.default_server_id = Some(Uuid::new_v4());
+        assert_eq!(config.get_default_or_first_server(), Some(&s1));
+
+        let users_s1 = config.get_users_for_server(s1_id);
+        assert_eq!(users_s1.len(), 2);
+        assert!(users_s1.contains(&&u1));
+        assert!(users_s1.contains(&&u2));
+
+        let users_s2 = config.get_users_for_server(s2_id);
+        assert_eq!(users_s2.len(), 1);
+        assert!(users_s2.contains(&&u3));
+
+        assert_eq!(config.get_remember_me_user_for_server(s1_id), Some(&u2));
+        assert_eq!(config.get_remember_me_user_for_server(s2_id), None);
     }
 }

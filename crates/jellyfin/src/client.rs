@@ -123,6 +123,18 @@ impl AuthenticatedClient {
         }
     }
 
+    pub fn from_token(client: Client, access_token: String, user_id: String) -> Self {
+        let auth_header = client.auth_header.with_user_id(user_id.clone());
+
+        Self {
+            base_url: client.base_url,
+            http_client: client.http_client,
+            auth_header,
+            access_token,
+            user_id,
+        }
+    }
+
     pub async fn get(&self, path: &str) -> Result<reqwest::Response> {
         let url = format!("{}{}", self.base_url, path);
         let auth = self.auth_header.build();

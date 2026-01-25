@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::views::home::HomeView;
 use jellyfin::client::ClientBuilder;
 use jellyfin::error::JellyfinError;
 use settings::{ServerConfig, UserConfig};
@@ -130,6 +131,16 @@ impl LoginView {
                                 "Welcome, {}!",
                                 auth_result.user.name
                             ));
+
+                            let user_name = auth_result.user.name.clone();
+                            let server_name = server.name.clone();
+
+                            cx.update_global::<AppStateGlobal, _>(|global, cx| {
+                                global.0.update(cx, |state, cx| {
+                                    state.current_view = AppView::Home(HomeView::new(user_name, server_name, cx));
+                                    cx.notify();
+                                });
+                            });
                         }
                         Err(e) => {
                             tracing::error!("Authentication failed: {}", e);

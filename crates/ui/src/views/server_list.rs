@@ -1,14 +1,27 @@
 use crate::prelude::*;
 use crate::views::login::LoginView;
+use crate::views::user_selection::UserSelectionView;
 
 pub struct ServerListView {
     focus_handle: FocusHandle,
+    selection_mode: bool,
 }
 
 impl ServerListView {
     pub fn new(cx: &mut App) -> Entity<Self> {
         let focus_handle = cx.focus_handle();
-        cx.new(|_| Self { focus_handle })
+        cx.new(|_| Self {
+            focus_handle,
+            selection_mode: false,
+        })
+    }
+
+    pub fn new_selection_mode(cx: &mut App) -> Entity<Self> {
+        let focus_handle = cx.focus_handle();
+        cx.new(|_| Self {
+            focus_handle,
+            selection_mode: true,
+        })
     }
 
     fn add_server(_: &ClickEvent, _window: &mut Window, cx: &mut App) {
@@ -31,6 +44,38 @@ impl ServerListView {
         });
     }
 
+    fn select_server(server: settings::ServerConfig, cx: &mut App) {
+        cx.update_global::<ConfigGlobal, _>(|config, cx| {
+            config.model.update(cx, |model, _| {
+                model.settings.default_server_id = Some(server.id);
+                let _ = model.save();
+            });
+        });
+
+        let config_global = cx.global::<ConfigGlobal>();
+        let config = config_global.model.read(cx);
+        let users = config.get_users_for_server(server.id);
+
+        let server_clone = server.clone();
+        let users_clone = users.into_iter().cloned().collect::<Vec<_>>();
+        let has_users = !users_clone.is_empty();
+
+        cx.update_global::<AppStateGlobal, _>(move |global, cx| {
+            global.0.update(cx, |state, cx| {
+                if has_users {
+                    state.current_view = AppView::UserSelection(UserSelectionView::new(
+                        server_clone,
+                        users_clone,
+                        cx,
+                    ));
+                } else {
+                    state.current_view = AppView::Login(LoginView::new(server_clone, cx));
+                }
+                cx.notify();
+            });
+        });
+    }
+
     fn remove_server(id: uuid::Uuid, cx: &mut App) {
         cx.update_global::<ConfigGlobal, _>(|config, cx| {
             config.model.update(cx, |model, _cx| {
@@ -46,6 +91,7 @@ impl Render for ServerListView {
         let config_global = cx.global::<ConfigGlobal>();
         let config = config_global.model.read(cx);
         let servers = config.servers.clone();
+        let selection_mode = self.selection_mode;
 
         div()
             .flex()
@@ -63,16 +109,23 @@ impl Render for ServerListView {
                         div()
                             .text_xl()
                             .font_weight(FontWeight::BOLD)
-                            .child("Servers"),
+                            .child(if selection_mode {
+                                "Select Default Server"
+                            } else {
+                                "Servers"
+                            }),
                     )
-                    .child(
+                    .child(if !selection_mode {
                         button()
                             .size(ButtonSize::Regular)
                             .intent(ButtonIntent::Primary)
                             .child("Add Server")
                             .id("add-server-btn")
-                            .on_click(|ev, win, cx| Self::add_server(ev, win, cx)),
-                    ),
+                            .on_click(|ev, win, cx| Self::add_server(ev, win, cx))
+                            .into_any_element()
+                    } else {
+                        div().into_any_element()
+                    }),
             )
             .child(
                 div()
@@ -93,6 +146,7 @@ impl Render for ServerListView {
                             .into_iter()
                             .map(|server| {
                                 let server_for_connect = server.clone();
+                                let server_for_select = server.clone();
                                 div()
                                     .flex()
                                     .justify_between()
@@ -124,19 +178,30 @@ impl Render for ServerListView {
                                                 button()
                                                     .size(ButtonSize::Regular)
                                                     .intent(ButtonIntent::Primary)
-                                                    .child("Connect")
+                                                    .child(if selection_mode {
+                                                        "Select"
+                                                    } else {
+                                                        "Connect"
+                                                    })
                                                     .id(SharedString::from(format!(
                                                         "connect-{}",
                                                         server.id
                                                     )))
                                                     .on_click(move |_, _, cx| {
-                                                        Self::connect_to_server(
-                                                            server_for_connect.clone(),
-                                                            cx,
-                                                        );
+                                                        if selection_mode {
+                                                            Self::select_server(
+                                                                server_for_select.clone(),
+                                                                cx,
+                                                            );
+                                                        } else {
+                                                            Self::connect_to_server(
+                                                                server_for_connect.clone(),
+                                                                cx,
+                                                            );
+                                                        }
                                                     }),
                                             )
-                                            .child(
+                                            .child(if !selection_mode {
                                                 button()
                                                     .size(ButtonSize::Regular)
                                                     .intent(ButtonIntent::Danger)
@@ -147,8 +212,11 @@ impl Render for ServerListView {
                                                     )))
                                                     .on_click(move |_, _, cx| {
                                                         Self::remove_server(server.id, cx);
-                                                    }),
-                                            ),
+                                                    })
+                                                    .into_any_element()
+                                            } else {
+                                                div().into_any_element()
+                                            }),
                                     )
                                     .into_any_element()
                             })

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::views::login::LoginView;
 use jellyfin::{client::ClientBuilder, models::PublicServerInfo, system};
 use settings::ServerConfig;
 
@@ -108,29 +109,36 @@ impl AddServerView {
             return;
         };
 
+        let mut saved_server_config = None;
+
         cx.update_global::<ConfigGlobal, _>(|config, cx| {
             config.model.update(cx, |model, _cx| {
-                // Parse ID or generate new if empty
                 let uuid = uuid::Uuid::parse_str(&id).unwrap_or_else(|_| uuid::Uuid::new_v4());
                 
-                model.add_server(ServerConfig {
+                let server_config = ServerConfig {
                     id: uuid,
                     name,
                     url,
-                    device_id: uuid::Uuid::new_v4(), // Generate device ID for this server connection
-                });
+                    device_id: uuid::Uuid::new_v4(),
+                };
+                
+                model.add_server(server_config.clone());
+                model.settings.default_server_id = Some(uuid);
                 let _ = model.save();
+
+                saved_server_config = Some(server_config);
             });
         });
         
-        // Navigate back
-        cx.update_global::<AppStateGlobal, _>(|global, cx| {
-            global.0.update(cx, |state, cx| {
-                 let view = ServerListView::new(cx);
-                 state.current_view = AppView::ServerList(view);
-                 cx.notify();
+        if let Some(server) = saved_server_config {
+            cx.update_global::<AppStateGlobal, _>(|global, cx| {
+                global.0.update(cx, |state, cx| {
+                     let view = LoginView::new(server, cx);
+                     state.current_view = AppView::Login(view);
+                     cx.notify();
+                });
             });
-        });
+        }
     }
 }
 

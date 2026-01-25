@@ -1,4 +1,7 @@
-use crate::views::{add_server::AddServerView, login::LoginView, server_list::ServerListView};
+use crate::views::{
+    add_server::AddServerView, home::HomeView, login::LoginView, server_list::ServerListView,
+    user_selection::UserSelectionView,
+};
 use gpui::*;
 use settings::{Config, SettingsWatcher};
 
@@ -14,6 +17,8 @@ pub enum AppView {
     ServerList(Entity<ServerListView>),
     AddServer(Entity<AddServerView>),
     Login(Entity<LoginView>),
+    Home(Entity<HomeView>),
+    UserSelection(Entity<UserSelectionView>),
 }
 
 pub struct AppState {

@@ -1,11 +1,23 @@
-use crate::client::Client;
-use crate::error::Result;
+use crate::client::{AuthenticatedClient, Client};
+use crate::error::{JellyfinError, Result};
 use crate::models::PublicServerInfo;
 
 pub async fn get_public_info(client: &Client) -> Result<PublicServerInfo> {
     let response = client.get("/System/Info/Public").await?;
     let info = response.error_for_status()?.json().await?;
     Ok(info)
+}
+
+pub async fn validate_session(client: &AuthenticatedClient) -> Result<bool> {
+    let response = client.get("/System/Info").await?;
+    
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(JellyfinError::Unauthorized);
+    }
+    
+    // Any successful response means the token is valid
+    let _ = response.error_for_status()?;
+    Ok(true)
 }
 
 #[cfg(test)]
