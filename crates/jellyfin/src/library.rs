@@ -1,6 +1,6 @@
 use crate::client::AuthenticatedClient;
 use crate::error::Result;
-use crate::models::BaseItemDtoQueryResult;
+use crate::models::{BaseItemDto, BaseItemDtoQueryResult};
 
 pub async fn get_views(client: &AuthenticatedClient) -> Result<BaseItemDtoQueryResult> {
     let path = format!("/Users/{}/Views", client.user_id());
@@ -53,26 +53,26 @@ impl ItemsQuery {
             params.push(format!("Recursive={}", recursive));
         }
 
-        if let Some(types) = &self.include_item_types {
-            if !types.is_empty() {
-                params.push(format!("IncludeItemTypes={}", types.join(",")));
-            }
+        if let Some(types) = &self.include_item_types
+            && !types.is_empty()
+        {
+            params.push(format!("IncludeItemTypes={}", types.join(",")));
         }
 
-        if let Some(sort_by) = &self.sort_by {
-            if !sort_by.is_empty() {
-                params.push(format!("SortBy={}", sort_by.join(",")));
-            }
+        if let Some(sort_by) = &self.sort_by
+            && !sort_by.is_empty()
+        {
+            params.push(format!("SortBy={}", sort_by.join(",")));
         }
 
         if let Some(sort_order) = &self.sort_order {
             params.push(format!("SortOrder={}", sort_order));
         }
 
-        if let Some(fields) = &self.fields {
-            if !fields.is_empty() {
-                params.push(format!("Fields={}", fields.join(",")));
-            }
+        if let Some(fields) = &self.fields
+            && !fields.is_empty()
+        {
+            params.push(format!("Fields={}", fields.join(",")));
         }
 
         if let Some(limit) = self.limit {
@@ -100,6 +100,261 @@ pub async fn get_items(
         client.user_id(),
         query.to_query_string()
     );
+    let response = client.get(&path).await?;
+    let items = response.json::<BaseItemDtoQueryResult>().await?;
+    Ok(items)
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LatestQuery {
+    pub parent_id: Option<String>,
+    pub limit: Option<i32>,
+    pub include_item_types: Option<Vec<String>>,
+    pub group_items: Option<bool>,
+    pub fields: Option<Vec<String>>,
+}
+
+impl LatestQuery {
+    pub fn with_parent_id(mut self, parent_id: impl Into<String>) -> Self {
+        self.parent_id = Some(parent_id.into());
+        self
+    }
+
+    pub fn with_limit(mut self, limit: i32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_include_item_types(mut self, types: Vec<String>) -> Self {
+        self.include_item_types = Some(types);
+        self
+    }
+
+    pub fn with_group_items(mut self, group: bool) -> Self {
+        self.group_items = Some(group);
+        self
+    }
+
+    pub fn with_fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = Some(fields);
+        self
+    }
+
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+
+        if let Some(parent_id) = &self.parent_id {
+            params.push(format!("ParentId={}", parent_id));
+        }
+
+        if let Some(limit) = self.limit {
+            params.push(format!("Limit={}", limit));
+        }
+
+        if let Some(types) = &self.include_item_types
+            && !types.is_empty()
+        {
+            params.push(format!("IncludeItemTypes={}", types.join(",")));
+        }
+
+        if let Some(group) = self.group_items {
+            params.push(format!("GroupItems={}", group));
+        }
+
+        if let Some(fields) = &self.fields
+            && !fields.is_empty()
+        {
+            params.push(format!("Fields={}", fields.join(",")));
+        }
+
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        }
+    }
+}
+
+pub async fn get_latest(
+    client: &AuthenticatedClient,
+    query: &LatestQuery,
+) -> Result<Vec<BaseItemDto>> {
+    let path = format!(
+        "/Users/{}/Items/Latest{}",
+        client.user_id(),
+        query.to_query_string()
+    );
+    let response = client.get(&path).await?;
+    let items = response.json::<Vec<BaseItemDto>>().await?;
+    Ok(items)
+}
+
+#[derive(Debug, Clone)]
+pub struct ResumeQuery {
+    pub limit: Option<i32>,
+    pub recursive: bool,
+    pub media_types: Option<Vec<String>>,
+    pub fields: Option<Vec<String>>,
+    pub enable_image_types: Option<Vec<String>>,
+}
+
+impl Default for ResumeQuery {
+    fn default() -> Self {
+        Self {
+            limit: None,
+            recursive: true,
+            media_types: Some(vec!["Video".to_string()]),
+            fields: None,
+            enable_image_types: None,
+        }
+    }
+}
+
+impl ResumeQuery {
+    pub fn with_limit(mut self, limit: i32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_recursive(mut self, recursive: bool) -> Self {
+        self.recursive = recursive;
+        self
+    }
+
+    pub fn with_media_types(mut self, types: Vec<String>) -> Self {
+        self.media_types = Some(types);
+        self
+    }
+
+    pub fn with_fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = Some(fields);
+        self
+    }
+
+    pub fn with_enable_image_types(mut self, types: Vec<String>) -> Self {
+        self.enable_image_types = Some(types);
+        self
+    }
+
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+
+        params.push(format!("Recursive={}", self.recursive));
+
+        if let Some(limit) = self.limit {
+            params.push(format!("Limit={}", limit));
+        }
+
+        if let Some(types) = &self.media_types
+            && !types.is_empty()
+        {
+            params.push(format!("MediaTypes={}", types.join(",")));
+        }
+
+        if let Some(fields) = &self.fields
+            && !fields.is_empty()
+        {
+            params.push(format!("Fields={}", fields.join(",")));
+        }
+
+        if let Some(types) = &self.enable_image_types
+            && !types.is_empty()
+        {
+            params.push(format!("EnableImageTypes={}", types.join(",")));
+        }
+
+        format!("?{}", params.join("&"))
+    }
+}
+
+pub async fn get_resume(
+    client: &AuthenticatedClient,
+    query: &ResumeQuery,
+) -> Result<BaseItemDtoQueryResult> {
+    let path = format!(
+        "/Users/{}/Items/Resume{}",
+        client.user_id(),
+        query.to_query_string()
+    );
+    let response = client.get(&path).await?;
+    let items = response.json::<BaseItemDtoQueryResult>().await?;
+    Ok(items)
+}
+
+#[derive(Debug, Clone)]
+pub struct NextUpQuery {
+    pub user_id: String,
+    pub series_id: Option<String>,
+    pub limit: Option<i32>,
+    pub fields: Option<Vec<String>>,
+    pub enable_image_types: Option<Vec<String>>,
+}
+
+impl NextUpQuery {
+    pub fn new(user_id: impl Into<String>) -> Self {
+        Self {
+            user_id: user_id.into(),
+            series_id: None,
+            limit: None,
+            fields: None,
+            enable_image_types: None,
+        }
+    }
+
+    pub fn with_series_id(mut self, series_id: impl Into<String>) -> Self {
+        self.series_id = Some(series_id.into());
+        self
+    }
+
+    pub fn with_limit(mut self, limit: i32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = Some(fields);
+        self
+    }
+
+    pub fn with_enable_image_types(mut self, types: Vec<String>) -> Self {
+        self.enable_image_types = Some(types);
+        self
+    }
+
+    pub fn to_query_string(&self) -> String {
+        let mut params = Vec::new();
+
+        params.push(format!("UserId={}", self.user_id));
+
+        if let Some(series_id) = &self.series_id {
+            params.push(format!("SeriesId={}", series_id));
+        }
+
+        if let Some(limit) = self.limit {
+            params.push(format!("Limit={}", limit));
+        }
+
+        if let Some(fields) = &self.fields
+            && !fields.is_empty()
+        {
+            params.push(format!("Fields={}", fields.join(",")));
+        }
+
+        if let Some(types) = &self.enable_image_types
+            && !types.is_empty()
+        {
+            params.push(format!("EnableImageTypes={}", types.join(",")));
+        }
+
+        format!("?{}", params.join("&"))
+    }
+}
+
+pub async fn get_next_up(
+    client: &AuthenticatedClient,
+    query: &NextUpQuery,
+) -> Result<BaseItemDtoQueryResult> {
+    let path = format!("/Shows/NextUp{}", query.to_query_string());
     let response = client.get(&path).await?;
     let items = response.json::<BaseItemDtoQueryResult>().await?;
     Ok(items)
@@ -140,5 +395,63 @@ mod tests {
 
         let qs = query.to_query_string();
         assert!(qs.contains("IncludeItemTypes=Movie,Series"));
+    }
+
+    #[test]
+    fn test_latest_query_with_limit() {
+        let query = LatestQuery::default().with_limit(16);
+        let qs = query.to_query_string();
+        assert!(qs.contains("Limit=16"));
+        assert!(qs.starts_with('?'));
+    }
+
+    #[test]
+    fn test_latest_query_with_parent_id() {
+        let query = LatestQuery::default()
+            .with_parent_id("parent-123")
+            .with_limit(10);
+        let qs = query.to_query_string();
+        assert!(qs.contains("ParentId=parent-123"));
+        assert!(qs.contains("Limit=10"));
+    }
+
+    #[test]
+    fn test_latest_query_empty() {
+        let query = LatestQuery::default();
+        assert_eq!(query.to_query_string(), "");
+    }
+
+    #[test]
+    fn test_resume_query_default() {
+        let query = ResumeQuery::default();
+        let qs = query.to_query_string();
+        assert!(qs.contains("Recursive=true"));
+        assert!(qs.contains("MediaTypes=Video"));
+    }
+
+    #[test]
+    fn test_resume_query_with_limit() {
+        let query = ResumeQuery::default().with_limit(20);
+        let qs = query.to_query_string();
+        assert!(qs.contains("Limit=20"));
+        assert!(qs.contains("Recursive=true"));
+    }
+
+    #[test]
+    fn test_next_up_query_with_user_id() {
+        let query = NextUpQuery::new("user-123");
+        let qs = query.to_query_string();
+        assert!(qs.contains("UserId=user-123"));
+    }
+
+    #[test]
+    fn test_next_up_query_with_series_id() {
+        let query = NextUpQuery::new("user-123")
+            .with_series_id("series-456")
+            .with_limit(5);
+        let qs = query.to_query_string();
+        assert!(qs.contains("UserId=user-123"));
+        assert!(qs.contains("SeriesId=series-456"));
+        assert!(qs.contains("Limit=5"));
     }
 }
