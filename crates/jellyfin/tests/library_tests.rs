@@ -1,6 +1,10 @@
 use jellyfin::client::{ClientBuilder, AuthenticatedClient};
 use jellyfin::user::authenticate_by_name;
-use jellyfin::library::{get_views, get_items, ItemsQuery};
+use jellyfin::library::{
+    get_views, get_items, ItemsQuery,
+    get_item, get_seasons, get_episodes, get_similar,
+    SeasonsQuery, EpisodesQuery, SimilarQuery
+};
 use jellyfin::models::CollectionType;
 
 const TEST_SERVER: &str = "http://localhost:8096";
@@ -141,5 +145,100 @@ async fn test_get_items_pagination() {
             let offset_res = get_items(&client, &query_offset).await.unwrap();
             assert_eq!(offset_res.items[0].id, *item2_id);
         }
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
+async fn test_get_item_details() {
+    let client = get_authenticated_client().await;
+    let query = ItemsQuery {
+        include_item_types: Some(vec!["Movie".to_string(), "Series".to_string()]),
+        limit: Some(1),
+        recursive: Some(true),
+        ..Default::default()
+    };
+    
+    let items = get_items(&client, &query).await.expect("Failed to get items");
+    
+    if let Some(first_item) = items.items.first() {
+        let details = get_item(&client, &first_item.id).await.expect("Failed to get item details");
+        assert_eq!(details.id, first_item.id);
+        assert!(details.name.is_some());
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
+async fn test_get_seasons_for_series() {
+    let client = get_authenticated_client().await;
+    let query = ItemsQuery {
+        include_item_types: Some(vec!["Series".to_string()]),
+        limit: Some(1),
+        recursive: Some(true),
+        ..Default::default()
+    };
+    
+    let items = get_items(&client, &query).await.expect("Failed to get series");
+    
+    if let Some(series) = items.items.first() {
+        let seasons_query = SeasonsQuery::default();
+        let seasons = get_seasons(&client, &series.id, &seasons_query).await.expect("Failed to get seasons");
+        assert!(seasons.total_record_count.is_some());
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
+async fn test_get_episodes_for_season() {
+    let client = get_authenticated_client().await;
+    
+    // 1. Find a series
+    let query = ItemsQuery {
+        include_item_types: Some(vec!["Series".to_string()]),
+        limit: Some(1),
+        recursive: Some(true),
+        ..Default::default()
+    };
+    let series_res = get_items(&client, &query).await.unwrap();
+    
+    if let Some(series) = series_res.items.first() {
+        // 2. Find a season
+        let seasons_query = SeasonsQuery::default();
+        let seasons_res = get_seasons(&client, &series.id, &seasons_query).await.unwrap();
+        
+        if let Some(season) = seasons_res.items.first() {
+            // 3. Get episodes
+            let episodes_query = EpisodesQuery::default()
+                .with_season_id(&season.id)
+                .with_limit(5);
+                
+            let episodes = get_episodes(&client, &series.id, &episodes_query).await.expect("Failed to get episodes");
+            
+            if !episodes.items.is_empty() {
+                assert_eq!(episodes.items[0].type_, "Episode");
+            }
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
+async fn test_get_similar_items() {
+    let client = get_authenticated_client().await;
+    let query = ItemsQuery {
+        include_item_types: Some(vec!["Movie".to_string(), "Series".to_string()]),
+        limit: Some(1),
+        recursive: Some(true),
+        ..Default::default()
+    };
+    
+    let items = get_items(&client, &query).await.expect("Failed to get items");
+    
+    if let Some(first_item) = items.items.first() {
+        let similar_query = SimilarQuery::default().with_limit(5);
+        let similar = get_similar(&client, &first_item.id, &similar_query).await.expect("Failed to get similar items");
+        // Similar items might be empty, but request should succeed
+        assert!(similar.total_record_count.is_some());
     }
 }
