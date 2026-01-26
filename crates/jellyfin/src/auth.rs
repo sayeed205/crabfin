@@ -1,3 +1,4 @@
+#[derive(Clone, Debug)]
 pub struct AuthorizationHeader {
     client: String,
     device: String,

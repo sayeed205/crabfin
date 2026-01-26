@@ -52,6 +52,7 @@ impl ClientBuilder {
     }
 }
 
+#[derive(Clone)]
 pub struct Client {
     base_url: String,
     http_client: reqwest::Client,
@@ -101,6 +102,7 @@ impl Client {
     }
 }
 
+#[derive(Clone)]
 pub struct AuthenticatedClient {
     base_url: String,
     http_client: reqwest::Client,
