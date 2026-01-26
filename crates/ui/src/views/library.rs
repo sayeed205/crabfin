@@ -79,9 +79,7 @@ impl LibraryView {
         });
 
         if let (Some(s_id), Some(u_id)) = (server_id, user_id) {
-            if let Err(e) = credentials::delete_token(s_id, &u_id) {
-                tracing::error!("Failed to delete token: {}", e);
-            }
+            credentials::delete_token(s_id, &u_id, cx).detach_and_log_err(cx);
         }
 
         cx.update_global::<AppStateGlobal, _>(|global, cx| {

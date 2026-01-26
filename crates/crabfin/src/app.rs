@@ -56,65 +56,70 @@ pub fn setup_config(cx: &mut App) {
         config.settings.last_server_id,
         config.settings.last_user_id.clone(),
     ) {
-        if let Ok(token) = credentials::get_token(server_id, &user_id) {
-            let server_config = config.get_server(server_id).cloned();
-            let user_config = config.get_user(&user_id, server_id).cloned();
+        let server_config = config.get_server(server_id).cloned();
+        let user_config = config.get_user(&user_id, server_id).cloned();
 
-            if let (Some(server), Some(user)) = (server_config, user_config) {
-                if user.remember_me {
-                    let server_url = server.url.clone();
-                    let _server_name = server.name.clone();
-                    let device_id = server.device_id.to_string();
-                    let _user_name = user.username.clone();
-                    let user_id_inner = user_id.clone();
+        if let (Some(server), Some(user)) = (server_config, user_config) {
+            if user.remember_me {
+                let token_task = credentials::get_token(server_id, &user_id, cx);
+                let server_url = server.url.clone();
+                let device_id = server.device_id.to_string();
+                let user_id_inner = user_id.clone();
 
-                    cx.spawn(move |cx: &mut AsyncApp| {
-                        let cx = cx.clone();
-                        async move {
-                            let valid_client = ui::runtime::runtime()
-                                .spawn(async move {
-                                    let client_builder = ClientBuilder::new(&server_url);
-                                    if let Ok(builder) = client_builder {
-                                        let client = builder.device_id(device_id).build();
-                                        if let Ok(client) = client {
-                                            let auth_client = AuthenticatedClient::from_token(
-                                                client,
-                                                token,
-                                                user_id_inner,
-                                            );
-                                            if system::validate_session(&auth_client)
-                                                .await
-                                                .unwrap_or(false)
-                                            {
-                                                return Some(auth_client);
-                                            }
+                cx.spawn(move |cx: &mut AsyncApp| {
+                    let cx = cx.clone();
+                    async move {
+                        let token = match token_task.await {
+                            Ok(t) => t,
+                            Err(e) => {
+                                tracing::warn!("Failed to retrieve stored token: {}", e);
+                                return;
+                            }
+                        };
+
+                        let valid_client = ui::runtime::runtime()
+                            .spawn(async move {
+                                let client_builder = ClientBuilder::new(&server_url);
+                                if let Ok(builder) = client_builder {
+                                    let client = builder.device_id(device_id).build();
+                                    if let Ok(client) = client {
+                                        let auth_client = AuthenticatedClient::from_token(
+                                            client,
+                                            token,
+                                            user_id_inner,
+                                        );
+                                        if system::validate_session(&auth_client)
+                                            .await
+                                            .unwrap_or(false)
+                                        {
+                                            return Some(auth_client);
                                         }
                                     }
-                                    None
-                                })
-                                .await;
+                                }
+                                None
+                            })
+                            .await;
 
-                            if let Ok(Some(auth_client)) = valid_client {
-                                let _ = cx.update_global::<AppStateGlobal, _>(|global, cx| {
-                                    global.0.update(cx, |state, cx| {
-                                        state.current_view =
-                                            AppView::Library(LibraryView::new(auth_client, cx));
-                                        cx.notify();
-                                    });
+                        if let Ok(Some(auth_client)) = valid_client {
+                            let _ = cx.update_global::<AppStateGlobal, _>(|global, cx| {
+                                global.0.update(cx, |state, cx| {
+                                    state.current_view =
+                                        AppView::Library(LibraryView::new(auth_client, cx));
+                                    cx.notify();
                                 });
-                            } else {
-                                let _ = cx.update_global::<ConfigGlobal, _>(|config, cx| {
-                                    config.model.update(cx, |model, _| {
-                                        model.settings.last_server_id = None;
-                                        model.settings.last_user_id = None;
-                                        let _ = model.save();
-                                    });
+                            });
+                        } else {
+                            let _ = cx.update_global::<ConfigGlobal, _>(|config, cx| {
+                                config.model.update(cx, |model, _| {
+                                    model.settings.last_server_id = None;
+                                    model.settings.last_user_id = None;
+                                    let _ = model.save();
                                 });
-                            }
+                            });
                         }
-                    })
-                    .detach();
-                }
+                    }
+                })
+                .detach();
             }
         }
     }

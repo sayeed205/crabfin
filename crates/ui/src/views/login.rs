@@ -107,13 +107,13 @@ impl LoginView {
                             );
 
                             if remember_me {
-                                if let Err(e) = credentials::store_token(
+                                credentials::store_token(
                                     server.id,
                                     &auth_result.user.id,
                                     &auth_result.access_token,
-                                ) {
-                                    tracing::error!("Failed to store token: {}", e);
-                                }
+                                    cx,
+                                )
+                                .detach_and_log_err(cx);
                             }
 
                             cx.update_global::<ConfigGlobal, _>(|config, cx| {

@@ -53,22 +53,25 @@ impl UserSelectionView {
             return;
         }
 
-        let token = match credentials::get_token(self.server.id, &user.id) {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::warn!("Failed to retrieve token for user {}: {}", user.username, e);
-                self.go_to_login(cx);
-                return;
-            }
-        };
-
         let server = self.server.clone();
         let user_id = user.id.clone();
         let username = user.username.clone();
+        let token_task = credentials::get_token(self.server.id, &user.id, cx);
 
         cx.spawn(move |view: gpui::WeakEntity<UserSelectionView>, cx: &mut gpui::AsyncApp| {
             let mut cx = cx.clone();
             async move {
+                let token = match token_task.await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::warn!("Failed to retrieve token for user {}: {}", username, e);
+                        view.update(&mut cx, |view, cx| {
+                            view.go_to_login(cx);
+                        }).ok();
+                        return;
+                    }
+                };
+
                 let valid_client = crate::runtime::runtime().spawn(async move {
                     if let Ok(builder) = ClientBuilder::new(&server.url) {
                         if let Ok(client) = builder.device_id(server.device_id.to_string()).build() {
