@@ -36,6 +36,7 @@ mod tests {
     use crate::client::ClientBuilder;
 
     #[tokio::test]
+    #[ignore = "Requires local Jellyfin server with specific credentials"]
     async fn test_authenticate_by_name_success() {
         let client = ClientBuilder::new("http://localhost:8096")
             .unwrap()

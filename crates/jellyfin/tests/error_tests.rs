@@ -15,6 +15,7 @@ async fn test_validate_server_fail() {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_authenticate_invalid_password() {
     let client = ClientBuilder::new("http://localhost:8096")
         .unwrap()
@@ -32,6 +33,7 @@ async fn test_authenticate_invalid_password() {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_authenticate_invalid_username() {
     let client = ClientBuilder::new("http://localhost:8096")
         .unwrap()
