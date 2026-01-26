@@ -106,7 +106,6 @@ pub struct AuthenticatedClient {
     http_client: reqwest::Client,
     auth_header: AuthorizationHeader,
     access_token: String,
-    #[allow(dead_code)]
     user_id: String,
 }
 
@@ -133,6 +132,10 @@ impl AuthenticatedClient {
             access_token,
             user_id,
         }
+    }
+
+    pub fn user_id(&self) -> &str {
+        &self.user_id
     }
 
     pub async fn get(&self, path: &str) -> Result<reqwest::Response> {

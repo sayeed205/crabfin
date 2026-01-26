@@ -5,3 +5,5 @@ pub mod error;
 pub mod models;
 pub mod system;
 pub mod user;
+pub mod library;
+
