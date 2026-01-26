@@ -106,9 +106,10 @@ impl HomeView {
 
     fn handle_browse(&mut self, _: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let client = self.client.clone();
+        let username = self.username.clone();
         cx.update_global::<AppStateGlobal, _>(move |global, cx| {
             global.0.update(cx, |state, cx| {
-                state.current_view = AppView::Library(LibraryView::new(client, cx));
+                state.current_view = AppView::Library(LibraryView::new(client, username, cx));
                 cx.notify();
             });
         });
@@ -180,7 +181,13 @@ impl HomeView {
                     .gap_4()
                     .overflow_x_scroll()
                     .pb_2()
-                    .children(items.iter().map(item_card))
+                    .children(items.iter().map(|item| {
+                        item_card(
+                            item,
+                            self.client.clone(),
+                            self.username.clone(),
+                        )
+                    }))
                     .into_any_element()
             })
     }

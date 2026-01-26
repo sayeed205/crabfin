@@ -146,6 +146,8 @@ impl Render for CrabfinApp {
                 AppView::UserSelection(v) => v.into_any_element(),
                 AppView::Library(v) => v.into_any_element(),
                 AppView::ItemGrid(v) => v.into_any_element(),
+                AppView::ItemDetail(v) => v.into_any_element(),
+                AppView::Season(v) => v.into_any_element(),
             })
     }
 }

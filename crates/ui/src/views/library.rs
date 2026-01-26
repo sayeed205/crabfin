@@ -9,6 +9,7 @@ use jellyfin::models::BaseItemDto;
 pub struct LibraryView {
     focus_handle: FocusHandle,
     client: AuthenticatedClient,
+    username: String,
     state: LibraryState,
 }
 
@@ -19,12 +20,13 @@ enum LibraryState {
 }
 
 impl LibraryView {
-    pub fn new(client: AuthenticatedClient, cx: &mut App) -> Entity<Self> {
+    pub fn new(client: AuthenticatedClient, username: String, cx: &mut App) -> Entity<Self> {
         let focus_handle = cx.focus_handle();
         cx.new(|cx| {
             let mut view = Self {
                 focus_handle,
                 client,
+                username,
                 state: LibraryState::Loading,
             };
             view.fetch_libraries(cx);
@@ -97,12 +99,14 @@ impl LibraryView {
         cx: &mut Context<Self>,
     ) {
         let client = self.client.clone();
+        let username = self.username.clone();
         cx.update_global::<AppStateGlobal, _>(move |global, cx| {
             global.0.update(cx, |state, cx| {
                 state.current_view = AppView::ItemGrid(ItemGridView::new(
                     library_id,
                     library_name,
                     client,
+                    username,
                     cx,
                 ));
                 cx.notify();

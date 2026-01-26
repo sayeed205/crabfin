@@ -1,6 +1,7 @@
 use crate::views::{
-    add_server::AddServerView, home::HomeView, item_grid::ItemGridView, library::LibraryView,
-    login::LoginView, server_list::ServerListView, user_selection::UserSelectionView,
+    add_server::AddServerView, home::HomeView, item_detail::ItemDetailView,
+    item_grid::ItemGridView, library::LibraryView, login::LoginView, season::SeasonView,
+    server_list::ServerListView, user_selection::UserSelectionView,
 };
 use gpui::*;
 use settings::{Config, SettingsWatcher};
@@ -21,6 +22,8 @@ pub enum AppView {
     UserSelection(Entity<UserSelectionView>),
     Library(Entity<LibraryView>),
     ItemGrid(Entity<ItemGridView>),
+    ItemDetail(Entity<ItemDetailView>),
+    Season(Entity<SeasonView>),
 }
 
 pub struct AppState {

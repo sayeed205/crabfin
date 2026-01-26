@@ -5,3 +5,5 @@ pub mod library;
 pub mod login;
 pub mod server_list;
 pub mod user_selection;
+pub mod item_detail;
+pub mod season;
