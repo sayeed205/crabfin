@@ -5,8 +5,8 @@ use credentials;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use jellyfin::system;
 use ui::views::{
-    add_server::AddServerView, home::HomeView, library::LibraryView, login::LoginView,
-    server_list::ServerListView, user_selection::UserSelectionView,
+    add_server::AddServerView, library::LibraryView, login::LoginView, server_list::ServerListView,
+    user_selection::UserSelectionView,
 };
 
 pub fn setup_config(cx: &mut App) {
@@ -63,9 +63,9 @@ pub fn setup_config(cx: &mut App) {
             if let (Some(server), Some(user)) = (server_config, user_config) {
                 if user.remember_me {
                     let server_url = server.url.clone();
-                    let server_name = server.name.clone();
+                    let _server_name = server.name.clone();
                     let device_id = server.device_id.to_string();
-                    let user_name = user.username.clone();
+                    let _user_name = user.username.clone();
                     let user_id_inner = user_id.clone();
 
                     cx.spawn(move |cx: &mut AsyncApp| {

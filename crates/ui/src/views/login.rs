@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::views::library::LibraryView;
-use crate::views::home::HomeView;
 use jellyfin::client::ClientBuilder;
 use jellyfin::error::JellyfinError;
 use settings::{ServerConfig, UserConfig};
