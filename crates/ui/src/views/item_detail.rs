@@ -4,7 +4,6 @@ use crate::prelude::*;
 use crate::state::{AppStateGlobal, AppView};
 use crate::views::home::HomeView;
 use crate::views::season::SeasonView;
-use gpui::Styled;
 use jellyfin::client::AuthenticatedClient;
 use jellyfin::library::{get_item, get_seasons, get_similar, SeasonsQuery, SimilarQuery};
 use jellyfin::models::BaseItemDto;
@@ -105,39 +104,20 @@ impl ItemDetailView {
         cx.update_global::<AppStateGlobal, _>(move |global, cx| {
             global.0.update(cx, |state, cx| {
                 state.current_view = AppView::Home(HomeView::new(username, client, cx));
-                cx.notify();
             });
         });
     }
 
-    fn handle_season_click(
-        &mut self,
-        season_id: String,
-        season_name: String,
-        _: &ClickEvent,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn render_season_card(&self, season: &BaseItemDto, series_name: String) -> impl IntoElement {
+        let id = season.id.clone();
+        let name = season.name.clone().unwrap_or_default();
+        let index = season.index_number.unwrap_or(0);
+        
         let client = self.client.clone();
         let series_id = self.item_id.clone();
         let username = self.username.clone();
-        let series_name = self.item.as_ref().and_then(|i| i.name.clone()).unwrap_or_default();
-        
-        cx.update_global::<AppStateGlobal, _>(move |global, cx| {
-            global.0.update(cx, |state, cx| {
-                state.current_view = AppView::Season(SeasonView::new(
-                    client, series_id, season_id, series_name, season_name, username, cx,
-                ));
-                cx.notify();
-            });
-        });
-    }
-
-    fn render_season_card(&self, season: &BaseItemDto, cx: &mut Context<Self>) -> impl IntoElement {
-        let id = season.id.clone();
-        let name = season.name.clone().unwrap_or_default();
-        let name_clone = name.clone();
-        let index = season.index_number.unwrap_or(0);
+        let season_id = id.clone();
+        let season_name = name.clone();
 
         div()
             .id(SharedString::from(id.clone()))
@@ -150,9 +130,22 @@ impl ItemDetailView {
             .rounded_md()
             .hover(|s| s.bg(rgb(0x45475a)))
             .cursor_pointer()
-            .on_click(cx.listener(move |view, event, window, cx| {
-                view.handle_season_click(id.clone(), name_clone.clone(), event, window, cx)
-            }))
+            .on_click(move |_, _, cx| {
+                let client = client.clone();
+                let series_id = series_id.clone();
+                let username = username.clone();
+                let season_id = season_id.clone();
+                let series_name = series_name.clone();
+                let season_name = season_name.clone();
+                
+                cx.update_global::<AppStateGlobal, _>(move |global, cx| {
+                    global.0.update(cx, |state, cx| {
+                        state.current_view = AppView::Season(SeasonView::new(
+                            client, series_id, season_id, series_name, season_name, username, cx,
+                        ));
+                    });
+                });
+            })
             .child(
                 div()
                     .h_64()
@@ -183,8 +176,7 @@ impl Render for ItemDetailView {
                 .size_full()
                 .bg(rgb(0x1e1e2e))
                 .text_color(rgb(0xcdd6f4))
-                .child("Loading...")
-                .into_any_element();
+                .child("Loading...");
         }
 
         let item = match &self.item {
@@ -198,18 +190,14 @@ impl Render for ItemDetailView {
                     .bg(rgb(0x1e1e2e))
                     .text_color(rgb(0xcdd6f4))
                     .child("Item not found")
-                    .into_any_element()
             }
         };
+        
+        let series_name = item.name.clone().unwrap_or_default();
 
         let mut season_cards = Vec::new();
         for s in &self.seasons {
-            season_cards.push(self.render_season_card(s, cx));
-        }
-
-        let mut similar_cards = Vec::new();
-        for item in &self.similar {
-            similar_cards.push(item_card(item, &self.client, self.username.clone(), cx));
+            season_cards.push(self.render_season_card(s, series_name.clone()));
         }
 
         div()
@@ -355,13 +343,14 @@ impl Render for ItemDetailView {
                             .gap_4()
                             .overflow_x_scroll()
                             .pb_2()
-                            .children(similar_cards),
+                            .children(self.similar.iter().map(|item| {
+                                item_card(item, self.client.clone(), self.username.clone())
+                            })),
                     )
                     .into_any_element()
             } else {
                 div().into_any_element()
             })
-            .into_any_element()
     }
 }
 

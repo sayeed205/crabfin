@@ -1,27 +1,25 @@
 use crate::prelude::*;
 use crate::state::{AppStateGlobal, AppView};
 use crate::views::item_detail::ItemDetailView;
-use gpui::InteractiveElement;
 use jellyfin::client::AuthenticatedClient;
 use jellyfin::models::BaseItemDto;
-use std::any::Any;
+use std::hash::{Hash, Hasher};
 
 pub fn item_card(
     item: &BaseItemDto,
-    client: &AuthenticatedClient,
+    client: AuthenticatedClient,
     username: String,
-    cx: &mut Context<impl Any>,
 ) -> impl IntoElement {
     let item_id = item.id.clone();
-    let client = client.clone();
-    let username = username.clone();
-    let name = item.name.clone().unwrap_or_default();
-    let production_year = item
-        .production_year
-        .map(|y| y.to_string())
-        .unwrap_or_default();
+    let client_clone = client.clone();
+    let username_clone = username.clone();
+    
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    item.id.hash(&mut hasher);
+    let id_hash = hasher.finish();
 
     div()
+        .id(("item", id_hash))
         .w_48()
         .flex()
         .flex_col()
@@ -31,18 +29,17 @@ pub fn item_card(
         .rounded_md()
         .hover(|s| s.bg(rgb(0x45475a)))
         .cursor_pointer()
-        .on_click(cx.listener(move |_, _, _, cx| {
-            let client = client.clone();
+        .on_click(move |_event, _window, cx| {
+            let client = client_clone.clone();
             let item_id = item_id.clone();
-            let username = username.clone();
+            let username = username_clone.clone();
             cx.update_global::<AppStateGlobal, _>(move |global, cx| {
                 global.0.update(cx, |state, cx| {
                     state.current_view =
                         AppView::ItemDetail(ItemDetailView::new(client, item_id, username, cx));
-                    cx.notify();
                 });
             });
-        }))
+        })
         .child(
             div()
                 .h_64()
@@ -60,12 +57,14 @@ pub fn item_card(
                 .text_sm()
                 .overflow_hidden()
                 .text_ellipsis()
-                .child(name),
+                .child(item.name.clone().unwrap_or_default()),
         )
         .child(
             div()
-                .text_xs()
-                .text_color(rgb(0xa6adc8))
-                .child(production_year),
+                .text_xs().text_color(rgb(0xa6adc8)).child(
+                    item.production_year
+                        .map(|y| y.to_string())
+                        .unwrap_or_default(),
+                ),
         )
 }
