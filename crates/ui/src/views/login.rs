@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::views::library::LibraryView;
 use crate::views::home::HomeView;
 use jellyfin::client::ClientBuilder;
 use jellyfin::error::JellyfinError;
@@ -80,7 +81,11 @@ impl LoginView {
                         match jellyfin::user::authenticate_by_name(&client, &username, &password)
                             .await
                         {
-                            Ok(auth_result) => Ok((auth_result, server, username, remember_me)),
+                            Ok(auth_result) => {
+                                let auth_client =
+                                    jellyfin::client::AuthenticatedClient::new(client, auth_result.clone());
+                                Ok((auth_result, server, username, remember_me, auth_client))
+                            }
                             Err(JellyfinError::Unauthorized) => {
                                 Err("Invalid username or password".to_string())
                             }
@@ -95,7 +100,7 @@ impl LoginView {
 
                 view.update(&mut cx, |view, cx| {
                     match result {
-                        Ok((auth_result, server, username, remember_me)) => {
+                        Ok((auth_result, server, username, remember_me, auth_client)) => {
                             tracing::info!(
                                 "Successfully authenticated {} on {}",
                                 auth_result.user.name,
@@ -132,12 +137,10 @@ impl LoginView {
                                 auth_result.user.name
                             ));
 
-                            let user_name = auth_result.user.name.clone();
-                            let server_name = server.name.clone();
-
                             cx.update_global::<AppStateGlobal, _>(|global, cx| {
                                 global.0.update(cx, |state, cx| {
-                                    state.current_view = AppView::Home(HomeView::new(user_name, server_name, cx));
+                                    state.current_view =
+                                        AppView::Library(LibraryView::new(auth_client, cx));
                                     cx.notify();
                                 });
                             });

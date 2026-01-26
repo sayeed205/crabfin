@@ -5,8 +5,8 @@ use credentials;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use jellyfin::system;
 use ui::views::{
-    add_server::AddServerView, home::HomeView, login::LoginView, server_list::ServerListView,
-    user_selection::UserSelectionView,
+    add_server::AddServerView, home::HomeView, library::LibraryView, login::LoginView,
+    server_list::ServerListView, user_selection::UserSelectionView,
 };
 
 pub fn setup_config(cx: &mut App) {
@@ -71,7 +71,7 @@ pub fn setup_config(cx: &mut App) {
                     cx.spawn(move |cx: &mut AsyncApp| {
                         let cx = cx.clone();
                         async move {
-                            let valid = ui::runtime::runtime()
+                            let valid_client = ui::runtime::runtime()
                                 .spawn(async move {
                                     let client_builder = ClientBuilder::new(&server_url);
                                     if let Ok(builder) = client_builder {
@@ -82,23 +82,23 @@ pub fn setup_config(cx: &mut App) {
                                                 token,
                                                 user_id_inner,
                                             );
-                                            return system::validate_session(&auth_client)
+                                            if system::validate_session(&auth_client)
                                                 .await
-                                                .unwrap_or(false);
+                                                .unwrap_or(false)
+                                            {
+                                                return Some(auth_client);
+                                            }
                                         }
                                     }
-                                    false
+                                    None
                                 })
                                 .await;
 
-                            if let Ok(true) = valid {
+                            if let Ok(Some(auth_client)) = valid_client {
                                 let _ = cx.update_global::<AppStateGlobal, _>(|global, cx| {
                                     global.0.update(cx, |state, cx| {
-                                        state.current_view = AppView::Home(HomeView::new(
-                                            user_name,
-                                            server_name,
-                                            cx,
-                                        ));
+                                        state.current_view =
+                                            AppView::Library(LibraryView::new(auth_client, cx));
                                         cx.notify();
                                     });
                                 });

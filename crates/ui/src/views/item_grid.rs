@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use crate::state::{AppStateGlobal, AppView};
+use crate::views::library::LibraryView;
 use jellyfin::client::AuthenticatedClient;
 use jellyfin::library::{get_items, ItemsQuery};
 use jellyfin::models::BaseItemDto;
@@ -78,10 +80,20 @@ impl ItemGridView {
         })
         .detach();
     }
+
+    fn handle_back(&mut self, _: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        let client = self.client.clone();
+        cx.update_global::<AppStateGlobal, _>(move |global, cx| {
+            global.0.update(cx, |state, cx| {
+                state.current_view = AppView::Library(LibraryView::new(client, cx));
+                cx.notify();
+            });
+        });
+    }
 }
 
 impl Render for ItemGridView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -102,7 +114,7 @@ impl Render for ItemGridView {
                             .child("Back")
                             .size(ButtonSize::Regular)
                             .intent(ButtonIntent::Secondary)
-                            .on_click(|_, _, _| {}), // Empty handler for now
+                            .on_click(cx.listener(Self::handle_back)),
                     )
                     .child(
                         div()

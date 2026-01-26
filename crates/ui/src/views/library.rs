@@ -160,13 +160,13 @@ impl Render for LibraryView {
                                 let item_name = item.name.clone();
                                 list.child(
                                     div()
-                                        .id(item.id.clone())
+                                        .id(SharedString::from(item.id.clone()))
                                         .p_2()
                                         .bg(rgb(0x313244))
                                         .rounded_md()
                                         .cursor_pointer()
                                         .hover(|s| s.bg(rgb(0x45475a)))
-                                        .on_click(cx.listener(move |this, _, cx| {
+                                        .on_click(cx.listener(move |this, _, _, cx| {
                                             this.handle_library_click(
                                                 item_id.clone(),
                                                 item_name.clone(),
