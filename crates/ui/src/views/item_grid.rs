@@ -51,8 +51,8 @@ impl ItemGridView {
             async move {
                 let query = ItemsQuery::default()
                     .with_parent_id(library_id)
-                    .with_recursive(true)
-                    .with_sort_by("SortName");
+                    .with_sort_by("SortName")
+                    .with_limit(100);
 
                 let result = crate::runtime::runtime()
                     .spawn(async move { get_items(&client, &query).await })
@@ -174,7 +174,7 @@ impl Render for ItemGridView {
                                         div()
                                             .font_weight(FontWeight::BOLD)
                                             .text_sm()
-                                            .child(item.name.clone()),
+                                            .child(item.name.clone().unwrap_or_default()),
                                     )
                                     .child(
                                         div()

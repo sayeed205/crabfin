@@ -3,6 +3,8 @@ use gpui::{prelude::*, px, size, App, Application, Bounds, WindowBounds, WindowO
 mod app;
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     Application::new().run(|cx: &mut App| {
         app::setup_config(cx);
         ui::components::text_input::bind_actions(cx);

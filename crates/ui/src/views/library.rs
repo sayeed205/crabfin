@@ -169,11 +169,11 @@ impl Render for LibraryView {
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             this.handle_library_click(
                                                 item_id.clone(),
-                                                item_name.clone(),
+                                                item_name.clone().unwrap_or_default(),
                                                 cx,
                                             )
                                         }))
-                                        .child(item.name.clone())
+                                        .child(item.name.clone().unwrap_or_default())
                                         .child(
                                             div()
                                                 .text_sm()

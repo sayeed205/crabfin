@@ -15,4 +15,6 @@ theme.workspace = true
 settings.workspace = true
 credentials.workspace = true
 assets.workspace = true
-video_player.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+

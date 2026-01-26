@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::views::home::HomeView;
+use crate::views::library::LibraryView;
 use crate::views::login::LoginView;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use settings::{ServerConfig, UserConfig};
@@ -48,13 +48,15 @@ impl UserSelectionView {
         let user = &self.users[user_idx];
 
         if !user.remember_me {
+            tracing::info!("User {} does not have remember_me set", user.username);
             self.go_to_login(cx);
             return;
         }
 
         let token = match credentials::get_token(self.server.id, &user.id) {
             Ok(t) => t,
-            Err(_) => {
+            Err(e) => {
+                tracing::warn!("Failed to retrieve token for user {}: {}", user.username, e);
                 self.go_to_login(cx);
                 return;
             }
@@ -67,18 +69,20 @@ impl UserSelectionView {
         cx.spawn(move |view: gpui::WeakEntity<UserSelectionView>, cx: &mut gpui::AsyncApp| {
             let mut cx = cx.clone();
             async move {
-                let is_valid = crate::runtime::runtime().spawn(async move {
+                let valid_client = crate::runtime::runtime().spawn(async move {
                     if let Ok(builder) = ClientBuilder::new(&server.url) {
                         if let Ok(client) = builder.device_id(server.device_id.to_string()).build() {
                             let auth_client = AuthenticatedClient::from_token(client, token, user_id);
-                            return jellyfin::system::validate_session(&auth_client).await.unwrap_or(false);
+                            if jellyfin::system::validate_session(&auth_client).await.unwrap_or(false) {
+                                return Some(auth_client);
+                            }
                         }
                     }
-                    false
-                }).await.unwrap_or(false);
+                    None
+                }).await;
 
                 view.update(&mut cx, |view, cx| {
-                    if is_valid {
+                    if let Ok(Some(auth_client)) = valid_client {
                         cx.update_global::<ConfigGlobal, _>(|config, cx| {
                             config.model.update(cx, |model, _| {
                                 model.settings.last_server_id = Some(view.server.id);
@@ -87,10 +91,9 @@ impl UserSelectionView {
                             });
                         });
 
-                        let server_name = view.server.name.clone();
                         cx.update_global::<AppStateGlobal, _>(|global, cx| {
                             global.0.update(cx, |state, cx| {
-                                state.current_view = AppView::Home(HomeView::new(username, server_name, cx));
+                                state.current_view = AppView::Library(LibraryView::new(auth_client, cx));
                                 cx.notify();
                             });
                         });

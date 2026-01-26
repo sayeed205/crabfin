@@ -34,10 +34,10 @@ pub struct UserItemDataDto {
 #[serde(rename_all = "PascalCase")]
 pub struct BaseItemDto {
     pub id: String,
-    pub name: String,
+    pub name: Option<String>,
     pub server_id: Option<String>,
     #[serde(rename = "Type")]
-    pub type_: String,
+    pub type_: String, // This is required
     pub collection_type: Option<CollectionType>,
     pub is_folder: Option<bool>,
     pub parent_id: Option<String>,
@@ -204,7 +204,7 @@ mod tests {
 
         let item: BaseItemDto = serde_json::from_str(json).unwrap();
         assert_eq!(item.id, "item-123");
-        assert_eq!(item.name, "Test Movie");
+        assert_eq!(item.name, Some("Test Movie".to_string()));
         assert_eq!(item.type_, "Movie");
         assert_eq!(item.production_year, Some(2023));
         assert_eq!(item.run_time_ticks, Some(72000000000));
@@ -232,6 +232,6 @@ mod tests {
         let result: BaseItemDtoQueryResult = serde_json::from_str(json).unwrap();
         assert_eq!(result.items.len(), 2);
         assert_eq!(result.total_record_count, Some(2));
-        assert_eq!(result.items[0].name, "Item 1");
+        assert_eq!(result.items[0].name, Some("Item 1".to_string()));
     }
 }

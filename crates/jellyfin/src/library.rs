@@ -37,6 +37,11 @@ impl ItemsQuery {
         self
     }
 
+    pub fn with_limit(mut self, limit: i32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
     pub fn to_query_string(&self) -> String {
         let mut params = Vec::new();
 
