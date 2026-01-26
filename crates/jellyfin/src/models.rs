@@ -32,6 +32,31 @@ pub struct UserItemDataDto {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+pub struct BaseItemPerson {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub role: Option<String>,
+    #[serde(rename = "Type")]
+    pub type_: Option<String>,
+    pub primary_image_tag: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct NameIdPair {
+    pub id: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ExternalUrl {
+    pub name: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct BaseItemDto {
     pub id: String,
     pub name: Option<String>,
@@ -53,6 +78,15 @@ pub struct BaseItemDto {
     pub series_id: Option<String>,
     pub series_name: Option<String>,
     pub season_id: Option<String>,
+    pub season_name: Option<String>,
+    pub genres: Option<Vec<String>>,
+    pub studios: Option<Vec<NameIdPair>>,
+    pub people: Option<Vec<BaseItemPerson>>,
+    pub taglines: Option<Vec<String>>,
+    pub index_number: Option<i32>,
+    pub parent_index_number: Option<i32>,
+    pub child_count: Option<i32>,
+    pub external_urls: Option<Vec<ExternalUrl>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -233,5 +267,67 @@ mod tests {
         assert_eq!(result.items.len(), 2);
         assert_eq!(result.total_record_count, Some(2));
         assert_eq!(result.items[0].name, Some("Item 1".to_string()));
+    }
+
+    #[test]
+    fn test_deserialize_base_item_person() {
+        let json = r#"{
+            "Id": "person-1",
+            "Name": "Actor Name",
+            "Role": "Hero",
+            "Type": "Actor",
+            "PrimaryImageTag": "tag-123"
+        }"#;
+
+        let person: BaseItemPerson = serde_json::from_str(json).unwrap();
+        assert_eq!(person.id, Some("person-1".to_string()));
+        assert_eq!(person.name, Some("Actor Name".to_string()));
+        assert_eq!(person.role, Some("Hero".to_string()));
+        assert_eq!(person.type_, Some("Actor".to_string()));
+        assert_eq!(person.primary_image_tag, Some("tag-123".to_string()));
+    }
+
+    #[test]
+    fn test_deserialize_base_item_dto_with_details() {
+        let json = r#"{
+            "Id": "item-123",
+            "Name": "Test Movie",
+            "Type": "Movie",
+            "Genres": ["Action", "Adventure"],
+            "Studios": [
+                { "Id": "studio-1", "Name": "Studio One" }
+            ],
+            "People": [
+                { "Name": "Actor 1", "Type": "Actor" }
+            ],
+            "Taglines": ["Just when you thought it was safe..."],
+            "IndexNumber": 1,
+            "ParentIndexNumber": 2,
+            "ChildCount": 5,
+            "ExternalUrls": [
+                { "Name": "IMDb", "Url": "https://imdb.com/title/tt1234567" }
+            ]
+        }"#;
+
+        let item: BaseItemDto = serde_json::from_str(json).unwrap();
+        assert_eq!(item.id, "item-123");
+        assert_eq!(item.name, Some("Test Movie".to_string()));
+        assert_eq!(item.genres.unwrap(), vec!["Action", "Adventure"]);
+        assert_eq!(
+            item.studios.unwrap()[0].name,
+            Some("Studio One".to_string())
+        );
+        assert_eq!(item.people.unwrap()[0].name, Some("Actor 1".to_string()));
+        assert_eq!(
+            item.taglines.unwrap()[0],
+            "Just when you thought it was safe..."
+        );
+        assert_eq!(item.index_number, Some(1));
+        assert_eq!(item.parent_index_number, Some(2));
+        assert_eq!(item.child_count, Some(5));
+        assert_eq!(
+            item.external_urls.unwrap()[0].name,
+            Some("IMDb".to_string())
+        );
     }
 }
