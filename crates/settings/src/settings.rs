@@ -146,10 +146,10 @@ impl Config {
     }
 
     pub fn get_default_or_first_server(&self) -> Option<&ServerConfig> {
-        if let Some(id) = self.settings.default_server_id {
-            if let Some(server) = self.get_server(id) {
-                return Some(server);
-            }
+        if let Some(id) = self.settings.default_server_id
+            && let Some(server) = self.get_server(id)
+        {
+            return Some(server);
         }
         self.servers.first()
     }

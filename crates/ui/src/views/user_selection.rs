@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::views::library::LibraryView;
+use crate::views::home::HomeView;
 use crate::views::login::LoginView;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use settings::{ServerConfig, UserConfig};
@@ -86,6 +86,7 @@ impl UserSelectionView {
 
                 view.update(&mut cx, |view, cx| {
                     if let Ok(Some(auth_client)) = valid_client {
+                        let username = view.users[user_idx].username.clone();
                         cx.update_global::<ConfigGlobal, _>(|config, cx| {
                             config.model.update(cx, |model, _| {
                                 model.settings.last_server_id = Some(view.server.id);
@@ -96,7 +97,7 @@ impl UserSelectionView {
 
                         cx.update_global::<AppStateGlobal, _>(|global, cx| {
                             global.0.update(cx, |state, cx| {
-                                state.current_view = AppView::Library(LibraryView::new(auth_client, cx));
+                                state.current_view = AppView::Home(HomeView::new(username, auth_client, cx));
                                 cx.notify();
                             });
                         });

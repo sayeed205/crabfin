@@ -24,6 +24,7 @@ async fn get_authenticated_client() -> AuthenticatedClient {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_get_views_returns_libraries() {
     let client = get_authenticated_client().await;
     let views = get_views(&client).await.expect("Failed to get views");
@@ -42,6 +43,7 @@ async fn test_get_views_returns_libraries() {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_get_items_by_parent() {
     let client = get_authenticated_client().await;
     let views = get_views(&client).await.expect("Failed to get views");
@@ -64,6 +66,7 @@ async fn test_get_items_by_parent() {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_get_items_recursive_movies() {
     let client = get_authenticated_client().await;
     
@@ -86,6 +89,7 @@ async fn test_get_items_recursive_movies() {
 }
 
 #[tokio::test]
+#[ignore = "Requires local Jellyfin server"]
 async fn test_get_items_pagination() {
     let client = get_authenticated_client().await;
     

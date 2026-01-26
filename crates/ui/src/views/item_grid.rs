@@ -1,3 +1,4 @@
+use crate::components::item_card::item_card;
 use crate::prelude::*;
 use crate::state::{AppStateGlobal, AppView};
 use crate::views::library::LibraryView;
@@ -149,44 +150,7 @@ impl Render for ItemGridView {
                             .flex()
                             .flex_wrap()
                             .gap_4()
-                            .children(self.items.iter().map(|item| {
-                                div()
-                                    .w_48()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .p_2()
-                                    .bg(rgb(0x313244))
-                                    .rounded_md()
-                                    .hover(|s| s.bg(rgb(0x45475a)))
-                                    .child(
-                                        div()
-                                            .h_64()
-                                            .bg(rgb(0x181825))
-                                            .rounded_sm()
-                                            .flex()
-                                            .justify_center()
-                                            .items_center()
-                                            .text_color(rgb(0x585b70))
-                                            .child("No Image"),
-                                    )
-                                    .child(
-                                        div()
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_sm()
-                                            .child(item.name.clone().unwrap_or_default()),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(rgb(0xa6adc8))
-                                            .child(
-                                                item.production_year
-                                                    .map(|y| y.to_string())
-                                                    .unwrap_or_default(),
-                                            ),
-                                    )
-                            }))
+                            .children(self.items.iter().map(item_card))
                     }),
             )
     }

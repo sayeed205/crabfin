@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::views::library::LibraryView;
+use crate::views::home::HomeView;
 use jellyfin::client::ClientBuilder;
 use jellyfin::error::JellyfinError;
 use settings::{ServerConfig, UserConfig};
@@ -139,7 +139,7 @@ impl LoginView {
                             cx.update_global::<AppStateGlobal, _>(|global, cx| {
                                 global.0.update(cx, |state, cx| {
                                     state.current_view =
-                                        AppView::Library(LibraryView::new(auth_client, cx));
+                                        AppView::Home(HomeView::new(auth_result.user.name.clone(), auth_client, cx));
                                     cx.notify();
                                 });
                             });

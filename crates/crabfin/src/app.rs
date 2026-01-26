@@ -5,7 +5,7 @@ use credentials;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use jellyfin::system;
 use ui::views::{
-    add_server::AddServerView, library::LibraryView, login::LoginView, server_list::ServerListView,
+    add_server::AddServerView, home::HomeView, login::LoginView, server_list::ServerListView,
     user_selection::UserSelectionView,
 };
 
@@ -65,6 +65,7 @@ pub fn setup_config(cx: &mut App) {
                 let server_url = server.url.clone();
                 let device_id = server.device_id.to_string();
                 let user_id_inner = user_id.clone();
+                let username = user.username.clone();
 
                 cx.spawn(move |cx: &mut AsyncApp| {
                     let cx = cx.clone();
@@ -104,7 +105,7 @@ pub fn setup_config(cx: &mut App) {
                             let _ = cx.update_global::<AppStateGlobal, _>(|global, cx| {
                                 global.0.update(cx, |state, cx| {
                                     state.current_view =
-                                        AppView::Library(LibraryView::new(auth_client, cx));
+                                        AppView::Home(HomeView::new(username, auth_client, cx));
                                     cx.notify();
                                 });
                             });
