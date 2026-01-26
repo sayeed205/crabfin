@@ -3,6 +3,38 @@ use crate::device;
 use crate::error::{JellyfinError, Result};
 use crate::models::{AuthenticationResult};
 use crate::system;
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ImageType {
+    Primary,
+    Backdrop,
+    Thumb,
+    Logo,
+    Banner,
+}
+
+impl fmt::Display for ImageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImageType::Primary => write!(f, "Primary"),
+            ImageType::Backdrop => write!(f, "Backdrop"),
+            ImageType::Thumb => write!(f, "Thumb"),
+            ImageType::Logo => write!(f, "Logo"),
+            ImageType::Banner => write!(f, "Banner"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ImageParams {
+    pub tag: String,
+    pub fill_width: Option<u32>,
+    pub fill_height: Option<u32>,
+    pub max_width: Option<u32>,
+    pub max_height: Option<u32>,
+    pub quality: Option<u8>,
+}
 
 pub struct ClientBuilder {
     base_url: String,
@@ -138,6 +170,33 @@ impl AuthenticatedClient {
 
     pub fn user_id(&self) -> &str {
         &self.user_id
+    }
+
+    pub fn image_url(&self, item_id: &str, image_type: ImageType, params: &ImageParams) -> String {
+        let mut url = format!(
+            "{}/Items/{}/Images/{}",
+            self.base_url, item_id, image_type
+        );
+
+        url.push_str(&format!("?tag={}", params.tag));
+
+        if let Some(w) = params.fill_width {
+            url.push_str(&format!("&fillWidth={}", w));
+        }
+        if let Some(h) = params.fill_height {
+            url.push_str(&format!("&fillHeight={}", h));
+        }
+        if let Some(w) = params.max_width {
+            url.push_str(&format!("&maxWidth={}", w));
+        }
+        if let Some(h) = params.max_height {
+            url.push_str(&format!("&maxHeight={}", h));
+        }
+        if let Some(q) = params.quality {
+            url.push_str(&format!("&quality={}", q));
+        }
+
+        url
     }
 
     pub async fn get(&self, path: &str) -> Result<reqwest::Response> {
@@ -276,5 +335,39 @@ mod tests {
         let res = auth_client.get("/get").await;
         
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_image_url_construction() {
+        let client = ClientBuilder::new("http://localhost:8096")
+            .unwrap()
+            .build()
+            .unwrap();
+        
+        let auth_result = AuthenticationResult {
+            user: UserInfo {
+                id: "user-123".into(),
+                name: "test".into(),
+                has_password: true,
+            },
+            access_token: "token-123".into(),
+            server_id: "server-123".into(),
+        };
+
+        let auth_client = AuthenticatedClient::new(client, auth_result);
+
+        let params = ImageParams {
+            tag: "tag123".to_string(),
+            fill_width: Some(300),
+            quality: Some(90),
+            ..Default::default()
+        };
+
+        let url = auth_client.image_url("item-123", ImageType::Primary, &params);
+        
+        assert_eq!(
+            url,
+            "http://localhost:8096/Items/item-123/Images/Primary?tag=tag123&fillWidth=300&quality=90"
+        );
     }
 }

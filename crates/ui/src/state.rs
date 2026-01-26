@@ -1,3 +1,4 @@
+use crate::image_store::ImageStore;
 use crate::views::{
     add_server::AddServerView, home::HomeView, item_detail::ItemDetailView,
     item_grid::ItemGridView, library::LibraryView, login::LoginView, season::SeasonView,
@@ -12,6 +13,9 @@ pub struct ConfigGlobal {
 }
 
 impl Global for ConfigGlobal {}
+
+pub struct ImageStoreGlobal(pub Entity<ImageStore>);
+impl Global for ImageStoreGlobal {}
 
 #[derive(Clone)]
 pub enum AppView {

@@ -163,11 +163,16 @@ impl Render for SeasonView {
                             .child("No episodes found")
                             .into_any_element()
                     } else {
+                        let mut cards = Vec::new();
+                        for item in &self.episodes {
+                            cards.push(episode_card(item, self.client.clone(), cx));
+                        }
+
                         div()
                             .flex()
                             .flex_col()
                             .gap_2()
-                            .children(self.episodes.iter().map(episode_card))
+                            .children(cards)
                             .into_any_element()
                     }),
             )

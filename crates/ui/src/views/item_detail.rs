@@ -1,10 +1,11 @@
 use crate::components::button::{button, ButtonIntent, ButtonSize};
+use crate::components::image_display::image_display;
 use crate::components::item_card::item_card;
 use crate::prelude::*;
 use crate::state::{AppStateGlobal, AppView};
 use crate::views::home::HomeView;
 use crate::views::season::SeasonView;
-use jellyfin::client::AuthenticatedClient;
+use jellyfin::client::{AuthenticatedClient, ImageType};
 use jellyfin::library::{get_item, get_seasons, get_similar, SeasonsQuery, SimilarQuery};
 use jellyfin::models::BaseItemDto;
 
@@ -108,16 +109,44 @@ impl ItemDetailView {
         });
     }
 
-    fn render_season_card(&self, season: &BaseItemDto, series_name: String) -> impl IntoElement {
+    fn render_season_card(
+        &self,
+        season: &BaseItemDto,
+        series_name: String,
+        cx: &mut App,
+    ) -> impl IntoElement + use<> {
         let id = season.id.clone();
         let name = season.name.clone().unwrap_or_default();
         let index = season.index_number.unwrap_or(0);
-        
+
         let client = self.client.clone();
         let series_id = self.item_id.clone();
         let username = self.username.clone();
         let season_id = id.clone();
         let season_name = name.clone();
+
+        let image = if let Some(tag) = season.image_tags.as_ref().and_then(|t| t.get("Primary")) {
+            image_display(
+                season.id.clone(),
+                ImageType::Primary,
+                tag.clone(),
+                192,
+                None,
+                client.clone(),
+                cx,
+            )
+            .into_any_element()
+        } else {
+            div()
+                .size_full()
+                .bg(rgb(0x181825))
+                .flex()
+                .justify_center()
+                .items_center()
+                .text_color(rgb(0x585b70))
+                .child(format!("Season {}", index))
+                .into_any_element()
+        };
 
         div()
             .id(SharedString::from(id.clone()))
@@ -137,11 +166,17 @@ impl ItemDetailView {
                 let season_id = season_id.clone();
                 let series_name = series_name.clone();
                 let season_name = season_name.clone();
-                
+
                 cx.update_global::<AppStateGlobal, _>(move |global, cx| {
                     global.0.update(cx, |state, cx| {
                         state.current_view = AppView::Season(SeasonView::new(
-                            client, series_id, season_id, series_name, season_name, username, cx,
+                            client,
+                            series_id,
+                            season_id,
+                            series_name,
+                            season_name,
+                            username,
+                            cx,
                         ));
                     });
                 });
@@ -151,11 +186,8 @@ impl ItemDetailView {
                     .h_64()
                     .bg(rgb(0x181825))
                     .rounded_sm()
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .text_color(rgb(0x585b70))
-                    .child(format!("Season {}", index)),
+                    .overflow_hidden()
+                    .child(image),
             )
             .child(
                 div()
@@ -197,160 +229,216 @@ impl Render for ItemDetailView {
 
         let mut season_cards = Vec::new();
         for s in &self.seasons {
-            season_cards.push(self.render_season_card(s, series_name.clone()));
+            season_cards.push(self.render_season_card(s, series_name.clone(), cx));
         }
 
+        let poster_image = if let Some(tag) = item.image_tags.as_ref().and_then(|t| t.get("Primary")) {
+            image_display(
+                item.id.clone(),
+                ImageType::Primary,
+                tag.clone(),
+                256,
+                None,
+                self.client.clone(),
+                cx,
+            )
+            .into_any_element()
+        } else {
+            div()
+                .size_full()
+                .bg(rgb(0x181825))
+                .flex()
+                .justify_center()
+                .items_center()
+                .text_color(rgb(0x585b70))
+                .child("No Image")
+                .into_any_element()
+        };
+
+        let backdrop = if let Some(tag) = item.backdrop_image_tags.as_ref().and_then(|t| t.first()) {
+            div()
+                .absolute()
+                .size_full()
+                .child(image_display(
+                    item.id.clone(),
+                    ImageType::Backdrop,
+                    tag.clone(),
+                    1920,
+                    None,
+                    self.client.clone(),
+                    cx,
+                ))
+                .child(div().absolute().size_full().bg(rgba(0x1e1e2ee6)))
+                .into_any_element()
+        } else {
+            div().into_any_element()
+        };
+
         div()
+            .relative()
             .flex()
             .flex_col()
             .size_full()
             .bg(rgb(0x1e1e2e))
             .text_color(rgb(0xcdd6f4))
+            .child(backdrop)
             .child(
                 div()
-                    .flex()
-                    .items_center()
-                    .p_4()
-                    .border_b_1()
-                    .border_color(rgb(0x313244))
-                    .child(
-                        button()
-                            .size(ButtonSize::Regular)
-                            .intent(ButtonIntent::Secondary)
-                            .id("back-btn")
-                            .child("Back")
-                            .on_click(cx.listener(Self::handle_back)),
-                    ),
-            )
-            .child(
-                div()
-                    .id("detail-scroll")
+                    .relative()
                     .flex()
                     .flex_col()
-                    .p_6()
-                    .gap_6()
-                    .overflow_y_scroll()
+                    .size_full()
                     .child(
                         div()
                             .flex()
+                            .items_center()
+                            .p_4()
+                            .border_b_1()
+                            .border_color(rgba(0x31324480))
+                            .child(
+                                button()
+                                    .size(ButtonSize::Regular)
+                                    .intent(ButtonIntent::Secondary)
+                                    .id("back-btn")
+                                    .child("Back")
+                                    .on_click(cx.listener(Self::handle_back)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id("detail-scroll")
+                            .flex()
+                            .flex_col()
+                            .p_6()
                             .gap_6()
+                            .overflow_y_scroll()
                             .child(
                                 div()
-                                    .w_64()
-                                    .h_96()
-                                    .bg(rgb(0x181825))
-                                    .rounded_lg()
                                     .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .text_color(rgb(0x585b70))
-                                    .child("No Image"),
+                                    .gap_6()
+                                    .child(
+                                        div()
+                                            .w_64()
+                                            .h_96()
+                                            .bg(rgb(0x181825))
+                                            .rounded_lg()
+                                            .overflow_hidden()
+                                            .child(poster_image),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("detail-content")
+                                            .flex()
+                                            .flex_col()
+                                            .gap_4()
+                                            .flex_1()
+                                            .child(
+                                                div()
+                                                    .text_3xl()
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .child(item.name.clone().unwrap_or_default()),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .gap_4()
+                                                    .text_color(rgb(0xa6adc8))
+                                                    .child(
+                                                        item.production_year
+                                                            .map(|y| y.to_string())
+                                                            .unwrap_or_default(),
+                                                    )
+                                                    .child(item.official_rating.clone().unwrap_or_default())
+                                                    .child(format!(
+                                                        "{} min",
+                                                        item.run_time_ticks.unwrap_or(0) / 10_000 / 1000 / 60
+                                                    )),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .gap_2()
+                                                    .children(item.genres.clone().unwrap_or_default().iter().map(
+                                                        |g| {
+                                                            div()
+                                                                .px_2()
+                                                                .py_1()
+                                                                .bg(rgb(0x313244))
+                                                                .rounded_md()
+                                                                .text_xs()
+                                                                .child(g.clone())
+                                                        },
+                                                    )),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_lg()
+                                                    .child(item.overview.clone().unwrap_or_default()),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(if !self.seasons.is_empty() {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .p_6()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_xl()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Seasons"),
                             )
                             .child(
                                 div()
-                                    .id("detail-content")
+                                    .id("seasons-scroll")
                                     .flex()
-                                    .flex_col()
                                     .gap_4()
-                                    .flex_1()
-                                    .child(
-                                        div()
-                                            .text_3xl()
-                                            .font_weight(FontWeight::BOLD)
-                                            .child(item.name.clone().unwrap_or_default()),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .gap_4()
-                                            .text_color(rgb(0xa6adc8))
-                                            .child(
-                                                item.production_year
-                                                    .map(|y| y.to_string())
-                                                    .unwrap_or_default(),
-                                            )
-                                            .child(item.official_rating.clone().unwrap_or_default())
-                                            .child(format!(
-                                                "{} min",
-                                                item.run_time_ticks.unwrap_or(0) / 10_000 / 1000 / 60
-                                            )),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .gap_2()
-                                            .children(item.genres.clone().unwrap_or_default().iter().map(
-                                                |g| {
-                                                    div()
-                                                        .px_2()
-                                                        .py_1()
-                                                        .bg(rgb(0x313244))
-                                                        .rounded_md()
-                                                        .text_xs()
-                                                        .child(g.clone())
-                                                },
-                                            )),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_lg()
-                                            .child(item.overview.clone().unwrap_or_default()),
-                                    ),
-                            ),
-                    ),
+                                    .overflow_x_scroll()
+                                    .pb_2()
+                                    .children(season_cards),
+                            )
+                            .into_any_element()
+                    } else {
+                        div().into_any_element()
+                    })
+                    .child(if !self.similar.is_empty() {
+                        let mut similar_cards = Vec::new();
+                        for item in &self.similar {
+                            similar_cards.push(item_card(
+                                item,
+                                self.client.clone(),
+                                self.username.clone(),
+                                cx,
+                            ));
+                        }
+
+                        div()
+                            .flex()
+                            .flex_col()
+                            .p_6()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_xl()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Similar Items"),
+                            )
+                            .child(
+                                div()
+                                    .id("similar-scroll")
+                                    .flex()
+                                    .gap_4()
+                                    .overflow_x_scroll()
+                                    .pb_2()
+                                    .children(similar_cards),
+                            )
+                            .into_any_element()
+                    } else {
+                        div().into_any_element()
+                    }),
             )
-            .child(if !self.seasons.is_empty() {
-                div()
-                    .flex()
-                    .flex_col()
-                    .p_6()
-                    .gap_4()
-                    .child(
-                        div()
-                            .text_xl()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Seasons"),
-                    )
-                    .child(
-                        div()
-                            .id("seasons-scroll")
-                            .flex()
-                            .gap_4()
-                            .overflow_x_scroll()
-                            .pb_2()
-                            .children(season_cards),
-                    )
-                    .into_any_element()
-            } else {
-                div().into_any_element()
-            })
-            .child(if !self.similar.is_empty() {
-                div()
-                    .flex()
-                    .flex_col()
-                    .p_6()
-                    .gap_4()
-                    .child(
-                        div()
-                            .text_xl()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Similar Items"),
-                    )
-                    .child(
-                        div()
-                            .id("similar-scroll")
-                            .flex()
-                            .gap_4()
-                            .overflow_x_scroll()
-                            .pb_2()
-                            .children(self.similar.iter().map(|item| {
-                                item_card(item, self.client.clone(), self.username.clone())
-                            })),
-                    )
-                    .into_any_element()
-            } else {
-                div().into_any_element()
-            })
     }
 }
 

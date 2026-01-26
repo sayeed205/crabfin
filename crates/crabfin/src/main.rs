@@ -5,8 +5,15 @@ mod app;
 fn main() {
     tracing_subscriber::fmt::init();
 
-    Application::new().run(|cx: &mut App| {
-        app::setup_config(cx);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _guard = runtime.enter();
+    let handle = runtime.handle().clone();
+
+    Application::new().run(move |cx: &mut App| {
+        app::setup_config(cx, handle.clone());
         ui::components::text_input::bind_actions(cx);
 
         let bounds = Bounds::centered(None, size(px(1024.), px(768.)), cx);

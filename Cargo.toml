@@ -102,6 +102,12 @@ image = "0.25"
 dirs = "6"
 
 #
+# Caching
+#
+
+lru = "0.12"
+
+#
 # Secure credential storage
 #
 

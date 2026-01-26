@@ -20,3 +20,9 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing.workspace = true
 unicode-segmentation.workspace = true
 uuid.workspace = true
+
+dirs.workspace = true
+image.workspace = true
+lru.workspace = true
+reqwest.workspace = true
+

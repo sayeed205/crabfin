@@ -147,6 +147,7 @@ impl HomeView {
         title: &str,
         items: &[BaseItemDto],
         loading: bool,
+        cx: &mut App,
     ) -> impl IntoElement {
         div()
             .flex()
@@ -175,19 +176,23 @@ impl HomeView {
                     .child("No items")
                     .into_any_element()
             } else {
+                let mut cards = Vec::new();
+                for item in items {
+                    cards.push(item_card(
+                        item,
+                        self.client.clone(),
+                        self.username.clone(),
+                        cx,
+                    ));
+                }
+
                 div()
                     .id(SharedString::from(id.to_string()))
                     .flex()
                     .gap_4()
                     .overflow_x_scroll()
                     .pb_2()
-                    .children(items.iter().map(|item| {
-                        item_card(
-                            item,
-                            self.client.clone(),
-                            self.username.clone(),
-                        )
-                    }))
+                    .children(cards)
                     .into_any_element()
             })
     }
@@ -257,12 +262,14 @@ impl Render for HomeView {
                         "Continue Watching",
                         &self.resume_items,
                         self.loading_resume,
+                        cx,
                     ))
                     .child(self.render_section(
                         "latest-section",
                         "Latest",
                         &self.latest_items,
                         self.loading_latest,
+                        cx,
                     )),
             )
     }

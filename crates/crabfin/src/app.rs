@@ -1,6 +1,7 @@
 use gpui::*;
 use settings::Config;
-use ui::state::{AppStateGlobal, AppView, ConfigGlobal};
+use ui::image_store::ImageStore;
+use ui::state::{AppStateGlobal, AppView, ConfigGlobal, ImageStoreGlobal};
 use credentials;
 use jellyfin::client::{AuthenticatedClient, ClientBuilder};
 use jellyfin::system;
@@ -9,7 +10,10 @@ use ui::views::{
     user_selection::UserSelectionView,
 };
 
-pub fn setup_config(cx: &mut App) {
+pub fn setup_config(cx: &mut App, runtime_handle: tokio::runtime::Handle) {
+    let image_store = ImageStore::new(cx, runtime_handle);
+    cx.set_global(ImageStoreGlobal(image_store));
+
     let config = Config::load().unwrap_or_default();
     let model = cx.new(|_| config.clone());
 

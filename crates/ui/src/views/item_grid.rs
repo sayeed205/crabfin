@@ -150,13 +150,21 @@ impl Render for ItemGridView {
                             .text_color(rgb(0xf38ba8))
                             .child(error.clone())
                     } else {
+                        let mut cards = Vec::new();
+                        for item in &self.items {
+                            cards.push(item_card(
+                                item,
+                                self.client.clone(),
+                                self.username.clone(),
+                                cx,
+                            ));
+                        }
+
                         div()
                             .flex()
                             .flex_wrap()
                             .gap_4()
-                            .children(self.items.iter().map(|item| {
-                                item_card(item, self.client.clone(), self.username.clone())
-                            }))
+                            .children(cards)
                     }),
             )
     }
