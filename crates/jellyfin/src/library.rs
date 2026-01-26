@@ -22,6 +22,21 @@ pub struct ItemsQuery {
 }
 
 impl ItemsQuery {
+    pub fn with_parent_id(mut self, parent_id: impl Into<String>) -> Self {
+        self.parent_id = Some(parent_id.into());
+        self
+    }
+
+    pub fn with_recursive(mut self, recursive: bool) -> Self {
+        self.recursive = Some(recursive);
+        self
+    }
+
+    pub fn with_sort_by(mut self, sort_by: impl Into<String>) -> Self {
+        self.sort_by = Some(vec![sort_by.into()]);
+        self
+    }
+
     pub fn to_query_string(&self) -> String {
         let mut params = Vec::new();
 

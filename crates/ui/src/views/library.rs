@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::state::{AppStateGlobal, AppView, ConfigGlobal};
+use crate::views::item_grid::ItemGridView;
 use crate::views::server_list::ServerListView;
 use jellyfin::client::AuthenticatedClient;
 use jellyfin::library::get_views;
@@ -90,6 +91,26 @@ impl LibraryView {
             });
         });
     }
+
+    fn handle_library_click(
+        &mut self,
+        library_id: String,
+        library_name: String,
+        cx: &mut Context<Self>,
+    ) {
+        let client = self.client.clone();
+        cx.update_global::<AppStateGlobal, _>(move |global, cx| {
+            global.0.update(cx, |state, cx| {
+                state.current_view = AppView::ItemGrid(ItemGridView::new(
+                    library_id,
+                    library_name,
+                    client,
+                    cx,
+                ));
+                cx.notify();
+            });
+        });
+    }
 }
 
 impl Render for LibraryView {
@@ -135,11 +156,23 @@ impl Render for LibraryView {
                         LibraryState::Loaded(items) => {
                             let list = div().flex().flex_col().gap_2();
                             items.iter().fold(list, |list, item| {
+                                let item_id = item.id.clone();
+                                let item_name = item.name.clone();
                                 list.child(
                                     div()
+                                        .id(item.id.clone())
                                         .p_2()
                                         .bg(rgb(0x313244))
                                         .rounded_md()
+                                        .cursor_pointer()
+                                        .hover(|s| s.bg(rgb(0x45475a)))
+                                        .on_click(cx.listener(move |this, _, cx| {
+                                            this.handle_library_click(
+                                                item_id.clone(),
+                                                item_name.clone(),
+                                                cx,
+                                            )
+                                        }))
                                         .child(item.name.clone())
                                         .child(
                                             div()
