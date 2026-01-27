@@ -142,10 +142,191 @@ pub struct UserInfo {
     pub has_password: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DlnaProfileType {
+    Video,
+    Audio,
+    Photo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SubtitleDeliveryMethod {
+    Encode,
+    Embed,
+    External,
+    Drop,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DirectPlayProfile {
+    pub container: Option<String>,
+    pub audio_codec: Option<String>,
+    pub video_codec: Option<String>,
+    #[serde(rename = "Type")]
+    pub type_: DlnaProfileType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct TranscodingProfile {
+    pub container: String,
+    #[serde(rename = "Type")]
+    pub type_: DlnaProfileType,
+    pub video_codec: Option<String>,
+    pub audio_codec: Option<String>,
+    pub protocol: Option<String>,
+    pub estimate_content_length: Option<bool>,
+    pub transcoding_seek_info: Option<String>,
+    pub context: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SubtitleProfile {
+    pub format: String,
+    pub method: SubtitleDeliveryMethod,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DeviceProfile {
+    pub name: Option<String>,
+    pub max_streaming_bitrate: Option<i64>,
+    pub max_static_bitrate: Option<i64>,
+    pub direct_play_profiles: Vec<DirectPlayProfile>,
+    pub transcoding_profiles: Vec<TranscodingProfile>,
+    pub subtitle_profiles: Vec<SubtitleProfile>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoRequest {
+    pub user_id: String,
+    pub max_streaming_bitrate: Option<i64>,
+    pub start_time_ticks: Option<i64>,
+    pub audio_stream_index: Option<i32>,
+    pub subtitle_stream_index: Option<i32>,
+    pub max_audio_channels: Option<i32>,
+    pub media_source_id: Option<String>,
+    pub enable_direct_play: Option<bool>,
+    pub enable_direct_stream: Option<bool>,
+    pub enable_transcoding: Option<bool>,
+    pub auto_open_live_stream: Option<bool>,
+    pub device_profile: DeviceProfile,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoResponse {
+    pub media_sources: Vec<MediaSourceInfo>,
+    pub play_session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub enum MediaStreamType {
+    Video,
+    Audio,
+    Subtitle,
+    EmbeddedImage,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaStream {
+    pub index: i32,
+    #[serde(rename = "Type")]
+    pub type_: MediaStreamType,
+    pub codec: Option<String>,
+    pub language: Option<String>,
+    pub display_title: Option<String>,
+    pub is_default: Option<bool>,
+    pub is_forced: Option<bool>,
+    pub is_external: Option<bool>,
+    pub height: Option<i32>,
+    pub width: Option<i32>,
+    pub bit_rate: Option<i64>,
+    pub channels: Option<i32>,
+    pub sample_rate: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaSourceInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub container: Option<String>,
+    pub size: Option<i64>,
+    pub bitrate: Option<i64>,
+    pub supports_direct_play: Option<bool>,
+    pub supports_direct_stream: Option<bool>,
+    pub supports_transcoding: Option<bool>,
+    pub direct_stream_url: Option<String>,
+    pub transcoding_url: Option<String>,
+    pub media_streams: Option<Vec<MediaStream>>,
+    #[serde(rename = "ETag")]
+    pub etag: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::from_str;
+
+    #[test]
+    fn test_serialize_device_profile() {
+        let profile = DeviceProfile {
+            name: Some("Crabfin".to_string()),
+            max_streaming_bitrate: Some(120000000),
+            max_static_bitrate: None,
+            direct_play_profiles: vec![DirectPlayProfile {
+                container: Some("mp4,mkv".to_string()),
+                audio_codec: Some("aac,ac3".to_string()),
+                video_codec: Some("h264,hevc".to_string()),
+                type_: DlnaProfileType::Video,
+            }],
+            transcoding_profiles: vec![],
+            subtitle_profiles: vec![SubtitleProfile {
+                format: "srt".to_string(),
+                method: SubtitleDeliveryMethod::External,
+            }],
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        assert!(json.contains("\"Name\":\"Crabfin\""));
+        assert!(json.contains("\"MaxStreamingBitrate\":120000000"));
+        assert!(json.contains("\"Type\":\"Video\""));
+        assert!(json.contains("\"Method\":\"External\""));
+    }
+
+    #[test]
+    fn test_serialize_direct_play_profile() {
+        let profile = DirectPlayProfile {
+            container: Some("mp4".to_string()),
+            audio_codec: None,
+            video_codec: Some("h264".to_string()),
+            type_: DlnaProfileType::Video,
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        assert!(json.contains("\"Container\":\"mp4\""));
+        assert!(json.contains("\"Type\":\"Video\""));
+        assert!(json.contains("\"VideoCodec\":\"h264\""));
+    }
+
+    #[test]
+    fn test_serialize_subtitle_profile() {
+        let profile = SubtitleProfile {
+            format: "ass".to_string(),
+            method: SubtitleDeliveryMethod::Embed,
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        assert!(json.contains("\"Format\":\"ass\""));
+        assert!(json.contains("\"Method\":\"Embed\""));
+    }
 
     #[test]
     fn test_deserialize_public_server_info() {
@@ -329,5 +510,133 @@ mod tests {
             item.external_urls.unwrap()[0].name,
             Some("IMDb".to_string())
         );
+    }
+
+    #[test]
+    fn test_serialize_playback_info_request() {
+        let profile = DeviceProfile {
+            name: Some("Test".to_string()),
+            max_streaming_bitrate: None,
+            max_static_bitrate: None,
+            direct_play_profiles: vec![],
+            transcoding_profiles: vec![],
+            subtitle_profiles: vec![],
+        };
+
+        let request = PlaybackInfoRequest {
+            user_id: "user-123".to_string(),
+            max_streaming_bitrate: Some(120000000),
+            start_time_ticks: Some(0),
+            audio_stream_index: None,
+            subtitle_stream_index: None,
+            max_audio_channels: Some(6),
+            media_source_id: None,
+            enable_direct_play: Some(true),
+            enable_direct_stream: Some(true),
+            enable_transcoding: Some(true),
+            auto_open_live_stream: Some(true),
+            device_profile: profile,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"UserId\":\"user-123\""));
+        assert!(json.contains("\"MaxStreamingBitrate\":120000000"));
+        assert!(json.contains("\"EnableDirectPlay\":true"));
+        assert!(json.contains("\"DeviceProfile\":{"));
+    }
+
+    #[test]
+    fn test_deserialize_playback_info_response() {
+        let json = r#"{
+            "MediaSources": [
+                {
+                    "Id": "source-1",
+                    "SupportsDirectPlay": true
+                }
+            ],
+            "PlaySessionId": "session-abc-123"
+        }"#;
+
+        let response: PlaybackInfoResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            response.play_session_id,
+            Some("session-abc-123".to_string())
+        );
+        assert_eq!(response.media_sources.len(), 1);
+        assert_eq!(response.media_sources[0].id, "source-1");
+    }
+
+    #[test]
+    fn test_deserialize_media_stream() {
+        let json = r#"{
+            "Index": 0,
+            "Type": "Video",
+            "Codec": "h264",
+            "Language": "eng",
+            "DisplayTitle": "1080p H.264",
+            "IsDefault": true,
+            "Height": 1080,
+            "Width": 1920,
+            "BitRate": 5000000
+        }"#;
+
+        let stream: MediaStream = serde_json::from_str(json).unwrap();
+        assert_eq!(stream.index, 0);
+        assert_eq!(stream.type_, MediaStreamType::Video);
+        assert_eq!(stream.codec, Some("h264".to_string()));
+        assert_eq!(stream.height, Some(1080));
+        assert_eq!(stream.width, Some(1920));
+    }
+
+    #[test]
+    fn test_deserialize_media_stream_audio() {
+        let json = r#"{
+            "Index": 1,
+            "Type": "Audio",
+            "Codec": "aac",
+            "Language": "eng",
+            "DisplayTitle": "English AAC 5.1",
+            "IsDefault": true,
+            "Channels": 6,
+            "SampleRate": 48000
+        }"#;
+
+        let stream: MediaStream = serde_json::from_str(json).unwrap();
+        assert_eq!(stream.type_, MediaStreamType::Audio);
+        assert_eq!(stream.channels, Some(6));
+    }
+
+    #[test]
+    fn test_deserialize_media_source_info() {
+        let json = r#"{
+            "Id": "source-123",
+            "Name": "Movie.mkv",
+            "Container": "mkv",
+            "Size": 1500000000,
+            "Bitrate": 8000000,
+            "SupportsDirectPlay": true,
+            "SupportsDirectStream": true,
+            "SupportsTranscoding": true,
+            "DirectStreamUrl": "/Videos/123/stream.mkv?static=true",
+            "MediaStreams": [
+                {"Index": 0, "Type": "Video", "Codec": "h264"},
+                {"Index": 1, "Type": "Audio", "Codec": "aac"}
+            ],
+            "ETag": "abc123"
+        }"#;
+
+        let source: MediaSourceInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(source.id, "source-123");
+        assert_eq!(source.container, Some("mkv".to_string()));
+        assert_eq!(source.supports_direct_play, Some(true));
+        assert!(source.media_streams.is_some());
+        assert_eq!(source.media_streams.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_media_stream_type_unknown() {
+        let json = r#"{"Index": 0, "Type": "FutureType"}"#;
+        let stream: MediaStream = serde_json::from_str(json).unwrap();
+        assert_eq!(stream.type_, MediaStreamType::Unknown);
     }
 }

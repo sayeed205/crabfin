@@ -1,7 +1,7 @@
 use crate::auth::AuthorizationHeader;
 use crate::device;
 use crate::error::{JellyfinError, Result};
-use crate::models::{AuthenticationResult};
+use crate::models::{AuthenticationResult, MediaSourceInfo};
 use crate::system;
 use std::fmt;
 
@@ -170,6 +170,80 @@ impl AuthenticatedClient {
 
     pub fn user_id(&self) -> &str {
         &self.user_id
+    }
+
+    /// Get the base URL of the server.
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Get the access token for this client.
+    pub fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
+    /// Construct a stream URL for video playback.
+    ///
+    /// Returns the appropriate URL based on the media source's capabilities:
+    /// - If direct play/stream is supported: constructs a static stream URL
+    /// - If only transcoding is supported: returns the transcoding URL
+    /// - If nothing is supported: returns None
+    ///
+    /// The returned URL includes the `api_key` parameter for authentication.
+    pub fn stream_url(&self, item_id: &str, media_source: &MediaSourceInfo) -> Option<String> {
+        // Check if we can direct play or direct stream
+        let can_direct = media_source.supports_direct_play.unwrap_or(false)
+            || media_source.supports_direct_stream.unwrap_or(false);
+
+        if can_direct {
+            // Use direct stream URL if provided by server
+            if let Some(ref direct_url) = media_source.direct_stream_url {
+                // The direct_stream_url is typically a relative URL, so we need to make it absolute
+                let full_url = if direct_url.starts_with('/') {
+                    format!("{}{}", self.base_url, direct_url)
+                } else {
+                    direct_url.clone()
+                };
+
+                // Add api_key if not already present
+                if full_url.contains("api_key=") {
+                    return Some(full_url);
+                } else {
+                    let separator = if full_url.contains('?') { "&" } else { "?" };
+                    return Some(format!("{}{}api_key={}", full_url, separator, self.access_token));
+                }
+            }
+
+            // Construct our own direct stream URL
+            let container = media_source.container.as_deref().unwrap_or("mkv");
+            return Some(format!(
+                "{}/Videos/{}/stream.{}?static=true&mediaSourceId={}&api_key={}",
+                self.base_url, item_id, container, media_source.id, self.access_token
+            ));
+        }
+
+        // Check if transcoding is available
+        if media_source.supports_transcoding.unwrap_or(false) {
+            if let Some(ref transcoding_url) = media_source.transcoding_url {
+                // Transcoding URL is typically relative
+                let full_url = if transcoding_url.starts_with('/') {
+                    format!("{}{}", self.base_url, transcoding_url)
+                } else {
+                    transcoding_url.clone()
+                };
+
+                // Add api_key if not already present
+                if full_url.contains("api_key=") {
+                    return Some(full_url);
+                } else {
+                    let separator = if full_url.contains('?') { "&" } else { "?" };
+                    return Some(format!("{}{}api_key={}", full_url, separator, self.access_token));
+                }
+            }
+        }
+
+        // No playback method available
+        None
     }
 
     pub fn image_url(&self, item_id: &str, image_type: ImageType, params: &ImageParams) -> String {
@@ -369,5 +443,130 @@ mod tests {
             url,
             "http://localhost:8096/Items/item-123/Images/Primary?tag=tag123&fillWidth=300&quality=90"
         );
+    }
+
+    fn create_test_auth_client() -> AuthenticatedClient {
+        let client = ClientBuilder::new("http://localhost:8096")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let auth_result = AuthenticationResult {
+            user: UserInfo {
+                id: "user-123".into(),
+                name: "test".into(),
+                has_password: true,
+            },
+            access_token: "my-secret-token".into(),
+            server_id: "server-123".into(),
+        };
+
+        AuthenticatedClient::new(client, auth_result)
+    }
+
+    #[test]
+    fn test_stream_url_direct_play() {
+        let auth_client = create_test_auth_client();
+
+        let media_source = MediaSourceInfo {
+            id: "source-123".to_string(),
+            name: Some("Movie.mkv".to_string()),
+            container: Some("mkv".to_string()),
+            size: None,
+            bitrate: None,
+            supports_direct_play: Some(true),
+            supports_direct_stream: Some(true),
+            supports_transcoding: Some(false),
+            direct_stream_url: None,
+            transcoding_url: None,
+            media_streams: None,
+            etag: None,
+        };
+
+        let url = auth_client.stream_url("item-456", &media_source);
+        assert!(url.is_some());
+
+        let url = url.unwrap();
+        assert!(url.contains("/Videos/item-456/stream.mkv"));
+        assert!(url.contains("static=true"));
+        assert!(url.contains("mediaSourceId=source-123"));
+        assert!(url.contains("api_key=my-secret-token"));
+    }
+
+    #[test]
+    fn test_stream_url_with_server_direct_url() {
+        let auth_client = create_test_auth_client();
+
+        let media_source = MediaSourceInfo {
+            id: "source-123".to_string(),
+            name: None,
+            container: Some("mp4".to_string()),
+            size: None,
+            bitrate: None,
+            supports_direct_play: Some(true),
+            supports_direct_stream: Some(true),
+            supports_transcoding: Some(false),
+            direct_stream_url: Some("/Videos/123/stream.mp4?static=true".to_string()),
+            transcoding_url: None,
+            media_streams: None,
+            etag: None,
+        };
+
+        let url = auth_client.stream_url("item-456", &media_source);
+        assert!(url.is_some());
+
+        let url = url.unwrap();
+        assert!(url.starts_with("http://localhost:8096/Videos/123/stream.mp4"));
+        assert!(url.contains("api_key=my-secret-token"));
+    }
+
+    #[test]
+    fn test_stream_url_transcoding() {
+        let auth_client = create_test_auth_client();
+
+        let media_source = MediaSourceInfo {
+            id: "source-123".to_string(),
+            name: None,
+            container: Some("mkv".to_string()),
+            size: None,
+            bitrate: None,
+            supports_direct_play: Some(false),
+            supports_direct_stream: Some(false),
+            supports_transcoding: Some(true),
+            direct_stream_url: None,
+            transcoding_url: Some("/Videos/123/main.m3u8?DeviceId=abc".to_string()),
+            media_streams: None,
+            etag: None,
+        };
+
+        let url = auth_client.stream_url("item-456", &media_source);
+        assert!(url.is_some());
+
+        let url = url.unwrap();
+        assert!(url.contains("/Videos/123/main.m3u8"));
+        assert!(url.contains("api_key=my-secret-token"));
+    }
+
+    #[test]
+    fn test_stream_url_no_source() {
+        let auth_client = create_test_auth_client();
+
+        let media_source = MediaSourceInfo {
+            id: "source-123".to_string(),
+            name: None,
+            container: None,
+            size: None,
+            bitrate: None,
+            supports_direct_play: Some(false),
+            supports_direct_stream: Some(false),
+            supports_transcoding: Some(false),
+            direct_stream_url: None,
+            transcoding_url: None,
+            media_streams: None,
+            etag: None,
+        };
+
+        let url = auth_client.stream_url("item-456", &media_source);
+        assert!(url.is_none());
     }
 }
