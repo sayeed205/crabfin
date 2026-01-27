@@ -270,6 +270,63 @@ pub struct MediaSourceInfo {
     pub etag: Option<String>,
 }
 
+// ============================================================================
+// Playback Reporting Types (Phase 16)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PlayMethod {
+    DirectPlay,
+    DirectStream,
+    Transcode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RepeatMode {
+    RepeatNone,
+    RepeatAll,
+    RepeatOne,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackStartInfo {
+    pub item_id: String,
+    pub media_source_id: Option<String>,
+    pub play_session_id: Option<String>,
+    pub play_method: PlayMethod,
+    pub can_seek: bool,
+    pub position_ticks: i64,
+    pub audio_stream_index: Option<i32>,
+    pub subtitle_stream_index: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackStopInfo {
+    pub item_id: String,
+    pub media_source_id: Option<String>,
+    pub play_session_id: Option<String>,
+    pub position_ticks: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackProgressInfo {
+    pub item_id: String,
+    pub media_source_id: Option<String>,
+    pub play_session_id: Option<String>,
+    pub position_ticks: i64,
+    pub is_paused: bool,
+    pub is_muted: bool,
+    pub volume_level: Option<i32>,
+    pub play_method: PlayMethod,
+    pub repeat_mode: RepeatMode,
+    pub can_seek: bool,
+    pub audio_stream_index: Option<i32>,
+    pub subtitle_stream_index: Option<i32>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,5 +695,101 @@ mod tests {
         let json = r#"{"Index": 0, "Type": "FutureType"}"#;
         let stream: MediaStream = serde_json::from_str(json).unwrap();
         assert_eq!(stream.type_, MediaStreamType::Unknown);
+    }
+
+    #[test]
+    fn test_serialize_play_method() {
+        assert_eq!(
+            serde_json::to_string(&PlayMethod::DirectPlay).unwrap(),
+            "\"DirectPlay\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PlayMethod::DirectStream).unwrap(),
+            "\"DirectStream\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PlayMethod::Transcode).unwrap(),
+            "\"Transcode\""
+        );
+    }
+
+    #[test]
+    fn test_serialize_repeat_mode() {
+        assert_eq!(
+            serde_json::to_string(&RepeatMode::RepeatNone).unwrap(),
+            "\"RepeatNone\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RepeatMode::RepeatAll).unwrap(),
+            "\"RepeatAll\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RepeatMode::RepeatOne).unwrap(),
+            "\"RepeatOne\""
+        );
+    }
+
+    #[test]
+    fn test_serialize_playback_start_info() {
+        let info = PlaybackStartInfo {
+            item_id: "item-123".to_string(),
+            media_source_id: Some("source-456".to_string()),
+            play_session_id: Some("session-789".to_string()),
+            play_method: PlayMethod::DirectPlay,
+            can_seek: true,
+            position_ticks: 0,
+            audio_stream_index: Some(1),
+            subtitle_stream_index: None,
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"ItemId\":\"item-123\""));
+        assert!(json.contains("\"MediaSourceId\":\"source-456\""));
+        assert!(json.contains("\"PlaySessionId\":\"session-789\""));
+        assert!(json.contains("\"PlayMethod\":\"DirectPlay\""));
+        assert!(json.contains("\"CanSeek\":true"));
+        assert!(json.contains("\"PositionTicks\":0"));
+    }
+
+    #[test]
+    fn test_serialize_playback_stop_info() {
+        let info = PlaybackStopInfo {
+            item_id: "item-123".to_string(),
+            media_source_id: Some("source-456".to_string()),
+            play_session_id: Some("session-789".to_string()),
+            position_ticks: 100_000_000, // 10 seconds
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"ItemId\":\"item-123\""));
+        assert!(json.contains("\"MediaSourceId\":\"source-456\""));
+        assert!(json.contains("\"PlaySessionId\":\"session-789\""));
+        assert!(json.contains("\"PositionTicks\":100000000"));
+    }
+
+    #[test]
+    fn test_serialize_playback_progress_info() {
+        let info = PlaybackProgressInfo {
+            item_id: "item-123".to_string(),
+            media_source_id: Some("source-456".to_string()),
+            play_session_id: Some("session-789".to_string()),
+            position_ticks: 50_000_000, // 5 seconds
+            is_paused: false,
+            is_muted: false,
+            volume_level: Some(100),
+            play_method: PlayMethod::DirectPlay,
+            repeat_mode: RepeatMode::RepeatNone,
+            can_seek: true,
+            audio_stream_index: Some(1),
+            subtitle_stream_index: None,
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"ItemId\":\"item-123\""));
+        assert!(json.contains("\"PositionTicks\":50000000"));
+        assert!(json.contains("\"IsPaused\":false"));
+        assert!(json.contains("\"IsMuted\":false"));
+        assert!(json.contains("\"VolumeLevel\":100"));
+        assert!(json.contains("\"RepeatMode\":\"RepeatNone\""));
     }
 }

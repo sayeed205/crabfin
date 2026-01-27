@@ -7,8 +7,19 @@ use crate::client::AuthenticatedClient;
 use crate::error::Result;
 use crate::models::{
     DeviceProfile, DirectPlayProfile, DlnaProfileType, PlaybackInfoRequest, PlaybackInfoResponse,
-    SubtitleDeliveryMethod, SubtitleProfile,
+    PlaybackProgressInfo, PlaybackStartInfo, PlaybackStopInfo, SubtitleDeliveryMethod,
+    SubtitleProfile,
 };
+
+/// Convert seconds to Jellyfin ticks (1 second = 10,000,000 ticks)
+pub fn ticks_from_seconds(seconds: f64) -> i64 {
+    (seconds * 10_000_000.0) as i64
+}
+
+/// Convert Jellyfin ticks to seconds
+pub fn seconds_from_ticks(ticks: i64) -> f64 {
+    ticks as f64 / 10_000_000.0
+}
 
 /// Get playback info for an item, negotiating the best stream based on device capabilities.
 ///
@@ -90,6 +101,48 @@ pub fn create_default_device_profile() -> DeviceProfile {
     }
 }
 
+// ============================================================================
+// Playback Reporting (Phase 16)
+// ============================================================================
+
+/// Report to the server that playback has started.
+///
+/// This should be called when the video player begins playing an item.
+/// The server uses this to show "Now Playing" on the dashboard.
+pub async fn report_playback_started(
+    client: &AuthenticatedClient,
+    info: &PlaybackStartInfo,
+) -> Result<()> {
+    client.post_json("/Sessions/Playing", info).await?;
+    Ok(())
+}
+
+/// Report playback progress to the server (heartbeat).
+///
+/// This should be called periodically (typically every 10 seconds) while
+/// playing to update the server on current position, pause state, etc.
+/// The server uses this for "Continue Watching" synchronization.
+pub async fn report_playback_progress(
+    client: &AuthenticatedClient,
+    info: &PlaybackProgressInfo,
+) -> Result<()> {
+    client.post_json("/Sessions/Playing/Progress", info).await?;
+    Ok(())
+}
+
+/// Report to the server that playback has stopped.
+///
+/// This should be called when the video player stops playing (user stops,
+/// video ends, or user navigates away). The server uses this to update
+/// the user's watch progress.
+pub async fn report_playback_stopped(
+    client: &AuthenticatedClient,
+    info: &PlaybackStopInfo,
+) -> Result<()> {
+    client.post_json("/Sessions/Playing/Stopped", info).await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,6 +177,22 @@ mod tests {
         assert!(json.contains("\"Name\":\"Crabfin\""));
         assert!(json.contains("\"MaxStreamingBitrate\":120000000"));
         assert!(json.contains("\"DirectPlayProfiles\""));
+    }
+
+    #[test]
+    fn test_ticks_from_seconds() {
+        assert_eq!(ticks_from_seconds(1.0), 10_000_000);
+        assert_eq!(ticks_from_seconds(0.5), 5_000_000);
+        assert_eq!(ticks_from_seconds(60.0), 600_000_000);
+        assert_eq!(ticks_from_seconds(0.0), 0);
+    }
+
+    #[test]
+    fn test_seconds_from_ticks() {
+        assert_eq!(seconds_from_ticks(10_000_000), 1.0);
+        assert_eq!(seconds_from_ticks(5_000_000), 0.5);
+        assert_eq!(seconds_from_ticks(600_000_000), 60.0);
+        assert_eq!(seconds_from_ticks(0), 0.0);
     }
 
     /// Integration test for full playback flow.
@@ -214,5 +283,105 @@ mod tests {
         }
 
         println!("✓ Full playback flow test passed!");
+    }
+
+    /// Integration test for playback reporting (Phase 16).
+    /// Requires local Jellyfin server at localhost:8096.
+    #[tokio::test]
+    #[ignore = "Requires local Jellyfin server with media content"]
+    async fn test_playback_reporting_flow() {
+        use crate::client::ClientBuilder;
+        use crate::library::{get_items, ItemsQuery};
+        use crate::models::{PlayMethod, RepeatMode};
+        use crate::user::authenticate_by_name;
+
+        // 1. Connect and authenticate
+        let client = ClientBuilder::new("http://localhost:8096")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let auth_result = authenticate_by_name(&client, "hitarashi", "9015@Media")
+            .await
+            .expect("Failed to authenticate");
+
+        let auth_client = crate::client::AuthenticatedClient::new(client, auth_result);
+
+        // 2. Get a playable item
+        let query = ItemsQuery::default().with_recursive(true).with_limit(1);
+
+        let items = get_items(&auth_client, &query)
+            .await
+            .expect("Failed to get items");
+
+        assert!(!items.items.is_empty(), "No items found in library");
+        let item = &items.items[0];
+        println!(
+            "Testing reporting for: {} ({})",
+            item.name.as_deref().unwrap_or("Unknown"),
+            item.type_
+        );
+
+        // 3. Get playback info to get session ID
+        let device_profile = create_default_device_profile();
+        let playback_info = get_playback_info(&auth_client, &item.id, device_profile)
+            .await
+            .expect("Failed to get playback info");
+
+        let media_source = &playback_info.media_sources[0];
+        let play_session_id = playback_info.play_session_id.clone();
+
+        // 4. Report playback started
+        let start_info = PlaybackStartInfo {
+            item_id: item.id.clone(),
+            media_source_id: Some(media_source.id.clone()),
+            play_session_id: play_session_id.clone(),
+            play_method: PlayMethod::DirectPlay,
+            can_seek: true,
+            position_ticks: 0,
+            audio_stream_index: None,
+            subtitle_stream_index: None,
+        };
+
+        report_playback_started(&auth_client, &start_info)
+            .await
+            .expect("Failed to report playback started");
+        println!("✓ Reported playback started");
+
+        // 5. Report progress (simulate 5 seconds in)
+        let progress_info = PlaybackProgressInfo {
+            item_id: item.id.clone(),
+            media_source_id: Some(media_source.id.clone()),
+            play_session_id: play_session_id.clone(),
+            position_ticks: ticks_from_seconds(5.0),
+            is_paused: false,
+            is_muted: false,
+            volume_level: Some(100),
+            play_method: PlayMethod::DirectPlay,
+            repeat_mode: RepeatMode::RepeatNone,
+            can_seek: true,
+            audio_stream_index: None,
+            subtitle_stream_index: None,
+        };
+
+        report_playback_progress(&auth_client, &progress_info)
+            .await
+            .expect("Failed to report playback progress");
+        println!("✓ Reported playback progress (5 seconds)");
+
+        // 6. Report playback stopped
+        let stop_info = PlaybackStopInfo {
+            item_id: item.id.clone(),
+            media_source_id: Some(media_source.id.clone()),
+            play_session_id: play_session_id.clone(),
+            position_ticks: ticks_from_seconds(10.0),
+        };
+
+        report_playback_stopped(&auth_client, &stop_info)
+            .await
+            .expect("Failed to report playback stopped");
+        println!("✓ Reported playback stopped (10 seconds)");
+
+        println!("✓ Full playback reporting test passed!");
     }
 }
